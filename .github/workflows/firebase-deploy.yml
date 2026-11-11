@@ -61,30 +61,24 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: dist-artifact
           path: dist
 
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEBLORANT }}
-          channelId: live
-          projectId: weblorant
+          python-version: '3.12'
 
-      - name: Deploy Firebase Realtime Database Rules
-        run: |
-          echo "$FIREBASE_SERVICE_ACCOUNT" > /tmp/firebase-sa.json
-          GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json npx --yes firebase-tools deploy --only database --project weblorant
-          rm -f /tmp/firebase-sa.json
+      - name: Install Google Auth
+        run: pip install google-auth requests
+
+      - name: Deploy to Firebase Hosting & Realtime Database
+        run: python3 scripts/deploy-firebase.py
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEBLORANT }}
+          FIREBASE_PROJECT_ID: weblorant
+          FIREBASE_SITE_ID: weblorant
+          FIREBASE_DATABASE_URL: https://weblorant-default-rtdb.europe-west1.firebasedatabase.app
