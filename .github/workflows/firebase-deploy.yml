@@ -61,23 +61,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: dist-artifact
           path: dist
 
-      - name: Deploy to Firebase Hosting & Database
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEBLORANT }}
           channelId: live
           projectId: weblorant
-        continue-on-error: true
 
-      - name: Fallback Deploy via Firebase CLI (if token provided)
-        if: env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only hosting,database --project weblorant --token "${{ secrets.FIREBASE_TOKEN }}"
+      - name: Deploy Firebase Realtime Database Rules
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > /tmp/firebase-sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/firebase-sa.json npx --yes firebase-tools deploy --only database --project weblorant
+          rm -f /tmp/firebase-sa.json
         env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_WEBLORANT }}
