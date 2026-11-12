@@ -80,12 +80,39 @@ export interface CrosshairSettings {
 /** Grafikqualität: low = Leistung, high = Standard, max = Schatten, Reflexionen, realistischeres Licht. */
 export type GraphicsQuality = 'low' | 'high' | 'max';
 
+export type KeybindAction =
+  | 'moveForward'
+  | 'moveBack'
+  | 'moveLeft'
+  | 'moveRight'
+  | 'jump'
+  | 'walk'
+  | 'crouch'
+  | 'reload'
+  | 'slot1'
+  | 'slot2'
+  | 'slot3'
+  | 'kernInteract'
+  | 'abilityQ'
+  | 'abilityE'
+  | 'abilityUlt'
+  | 'zoomCycle'
+  | 'buyMenu'
+  | 'scoreboard'
+  | 'abilityInfo'
+  | 'specialistSelect'
+  | 'debugOverlay'
+  | 'mapSwitchOffline';
+
+export type KeybindMap = Record<KeybindAction, string>;
+
 export interface GameSettings {
   graphics: GraphicsQuality;
   sensitivity: number;
   fov: number;
   volume: number;
   crosshair: CrosshairSettings;
+  keybinds: KeybindMap;
 }
 
 export type TeamId = 'A' | 'D';

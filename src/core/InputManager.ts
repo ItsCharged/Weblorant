@@ -1,11 +1,10 @@
-import { DEFAULT_SETTINGS, MOUSE_RAD_PER_COUNT, PITCH_LIMIT } from './Config';
+import { DEFAULT_KEYBINDS, DEFAULT_SETTINGS, MOUSE_RAD_PER_COUNT, PITCH_LIMIT } from './Config';
 import { clamp } from './math';
-import type { AbilitySlot, InputSnapshot, LoadoutSlot } from './types';
-
-const KERN_TAP_ABILITY_MAX_MS = 180;
+import type { AbilitySlot, InputSnapshot, KeybindMap, LoadoutSlot } from './types';
 
 export interface InputManagerOptions {
   sensitivity?: number;
+  keybinds?: KeybindMap;
   lockOnCanvasClick?: boolean;
   onDebugToggle?: () => void;
   onShopToggle?: () => void;
@@ -14,8 +13,11 @@ export interface InputManagerOptions {
   onSpectatorCycle?: (dir: 1 | -1) => void;
   onAbilityKey?: (slot: AbilitySlot) => void;
   onScoreboardToggle?: (held: boolean) => void;
-  /** Mausrad (oder Taste Z) bei gehaltenem Rechtsklick: nächste Zoomstufe. */
+  /** Mausrad (oder konfigurierte Zoom-Taste) bei gehaltenem Rechtsklick: nächste Zoomstufe. */
   onZoomCycle?: (dir: 1 | -1) => void;
+  onAbilityInfoToggle?: () => void;
+  onSpecialistSelectToggle?: () => void;
+  onMapSwitchOffline?: () => void;
 }
 
 export class InputManager {
@@ -23,6 +25,7 @@ export class InputManager {
   private readonly heldKeys = new Set<string>();
 
   private sensitivity: number;
+  private keybinds: KeybindMap;
   private readonly lockOnCanvasClick: boolean;
 
   private yaw = 0;
@@ -40,7 +43,6 @@ export class InputManager {
   private spectatorMode: boolean | null = null;
   private scoreboardHeld = false;
   private kernInteractAvailable = false;
-  private keyEDownAtMs: number | null = null;
 
   public onDebugToggle?: () => void;
   public onShopToggle?: () => void;
@@ -50,10 +52,14 @@ export class InputManager {
   public onAbilityKey?: (slot: AbilitySlot) => void;
   public onScoreboardToggle?: (held: boolean) => void;
   public onZoomCycle?: (dir: 1 | -1) => void;
+  public onAbilityInfoToggle?: () => void;
+  public onSpecialistSelectToggle?: () => void;
+  public onMapSwitchOffline?: () => void;
 
   constructor(canvas: HTMLCanvasElement, options: InputManagerOptions = {}) {
     this.canvas = canvas;
     this.sensitivity = options.sensitivity ?? DEFAULT_SETTINGS.sensitivity;
+    this.keybinds = { ...(options.keybinds ?? DEFAULT_KEYBINDS) };
     this.lockOnCanvasClick = options.lockOnCanvasClick ?? true;
 
     this.onDebugToggle = options.onDebugToggle;
@@ -64,6 +70,9 @@ export class InputManager {
     this.onAbilityKey = options.onAbilityKey;
     this.onScoreboardToggle = options.onScoreboardToggle;
     this.onZoomCycle = options.onZoomCycle;
+    this.onAbilityInfoToggle = options.onAbilityInfoToggle;
+    this.onSpecialistSelectToggle = options.onSpecialistSelectToggle;
+    this.onMapSwitchOffline = options.onMapSwitchOffline;
 
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
@@ -126,6 +135,15 @@ export class InputManager {
     return this.sensitivity;
   }
 
+  setKeybinds(nextKeybinds: KeybindMap): void {
+    this.keybinds = { ...nextKeybinds };
+    this.resetHeldInputs();
+  }
+
+  getKeybinds(): KeybindMap {
+    return { ...this.keybinds };
+  }
+
   setSpectatorMode(active: boolean): void {
     this.spectatorMode = active;
     if (active) {
@@ -141,9 +159,6 @@ export class InputManager {
 
   setKernInteractAvailable(available: boolean): void {
     this.kernInteractAvailable = available;
-    if (!available) {
-      this.keyEDownAtMs = null;
-    }
   }
 
   isKernInteractAvailable(): boolean {
@@ -185,23 +200,20 @@ export class InputManager {
       };
     }
 
-    const moveForward = (this.heldKeys.has('KeyW') ? 1 : 0) - (this.heldKeys.has('KeyS') ? 1 : 0);
-    const moveRight = (this.heldKeys.has('KeyD') ? 1 : 0) - (this.heldKeys.has('KeyA') ? 1 : 0);
+    const kb = this.keybinds;
+    const moveForward =
+      (this.heldKeys.has(kb.moveForward) ? 1 : 0) - (this.heldKeys.has(kb.moveBack) ? 1 : 0);
+    const moveRight =
+      (this.heldKeys.has(kb.moveRight) ? 1 : 0) - (this.heldKeys.has(kb.moveLeft) ? 1 : 0);
 
-    const crouch =
-      this.heldKeys.has('ControlLeft') ||
-      this.heldKeys.has('ControlRight') ||
-      this.heldKeys.has('KeyC');
+    const crouch = this.heldKeys.has(kb.crouch);
+    const walk = this.heldKeys.has(kb.walk);
 
-    const walk = this.heldKeys.has('ShiftLeft') || this.heldKeys.has('ShiftRight');
-
-    const jump = this.heldKeys.has('Space') || this.jumpLatched;
+    const jump = this.heldKeys.has(kb.jump) || this.jumpLatched;
     const fire = this.mouseLeftHeld || this.fireLatched;
-    const reload = this.heldKeys.has('KeyR') || this.reloadLatched;
+    const reload = this.heldKeys.has(kb.reload) || this.reloadLatched;
     const ads = this.mouseRightHeld;
-    const holdKern =
-      this.heldKeys.has('Digit4') ||
-      (this.kernInteractAvailable && this.heldKeys.has('KeyE'));
+    const holdKern = this.heldKeys.has(kb.kernInteract);
     const equipSlot = this.equipSlotLatched;
 
     this.jumpLatched = false;
@@ -249,7 +261,6 @@ export class InputManager {
     this.fireLatched = false;
     this.reloadLatched = false;
     this.equipSlotLatched = undefined;
-    this.keyEDownAtMs = null;
     if (this.scoreboardHeld) {
       this.scoreboardHeld = false;
       this.onScoreboardToggle?.(false);
@@ -325,7 +336,14 @@ export class InputManager {
   };
 
   private readonly handleKeyDown = (e: KeyboardEvent): void => {
-    if (e.code === 'F3') {
+    const targetEl = e.target as HTMLElement | null;
+    if (targetEl?.dataset?.keybindCapture === 'true') {
+      return;
+    }
+
+    const kb = this.keybinds;
+
+    if (e.code === kb.debugOverlay) {
       e.preventDefault();
       if (!e.repeat) {
         this.onDebugToggle?.();
@@ -333,33 +351,45 @@ export class InputManager {
       return;
     }
 
-    const tag = (e.target as HTMLElement | null)?.tagName;
+    const tag = targetEl?.tagName;
     const isFormField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-    if (e.code === 'KeyB' && !e.repeat && !isFormField) {
-      this.onShopToggle?.();
+    if (!e.repeat && !isFormField) {
+      if (e.code === kb.abilityInfo) {
+        e.preventDefault();
+        this.onAbilityInfoToggle?.();
+        return;
+      }
+      if (e.code === kb.specialistSelect) {
+        e.preventDefault();
+        this.onSpecialistSelectToggle?.();
+        return;
+      }
+      if (e.code === kb.mapSwitchOffline) {
+        this.onMapSwitchOffline?.();
+      }
+      if (e.code === kb.buyMenu) {
+        this.onShopToggle?.();
+      }
     }
 
-    if (
-      !e.repeat &&
-      !isFormField &&
-      (e.code === 'Digit1' ||
-        e.code === 'Digit2' ||
-        e.code === 'Digit3' ||
-        e.code === 'Digit4' ||
-        e.code === 'Digit5' ||
-        e.code === 'Digit6')
-    ) {
-      const slot = Number(e.code.slice(5));
-      if (slot >= 1 && slot <= 3 && this.isPointerLocked()) {
-        this.equipSlotLatched = slot as LoadoutSlot;
+    if (!e.repeat && !isFormField) {
+      let matchedSlot: LoadoutSlot | null = null;
+      if (e.code === kb.slot1) matchedSlot = 1;
+      else if (e.code === kb.slot2) matchedSlot = 2;
+      else if (e.code === kb.slot3) matchedSlot = 3;
+
+      if (matchedSlot !== null) {
+        if (this.isPointerLocked()) {
+          this.equipSlotLatched = matchedSlot;
+        }
+        this.onWeaponSlot?.(matchedSlot, e.code);
       }
-      this.onWeaponSlot?.(slot, e.code);
     }
 
     if (!this.isPointerLocked()) return;
 
-    if (e.code === 'Tab') {
+    if (e.code === kb.scoreboard) {
       e.preventDefault();
       if (!this.scoreboardHeld) {
         this.scoreboardHeld = true;
@@ -369,51 +399,39 @@ export class InputManager {
     }
 
     if (!e.repeat && !isFormField) {
-      if (e.code === 'KeyQ') {
+      if (e.code === kb.abilityQ) {
         this.onAbilityKey?.('q');
-      } else if (e.code === 'KeyE') {
-        if (this.kernInteractAvailable) {
-          this.keyEDownAtMs = performance.now();
-        } else {
-          this.keyEDownAtMs = null;
-          this.onAbilityKey?.('e');
-        }
-      } else if (e.code === 'KeyX') {
+      } else if (e.code === kb.abilityE) {
+        this.onAbilityKey?.('e');
+      } else if (e.code === kb.abilityUlt) {
         this.onAbilityKey?.('x');
-      } else if (e.code === 'KeyZ' && this.mouseRightHeld) {
+      } else if (e.code === kb.zoomCycle && this.mouseRightHeld) {
         this.onZoomCycle?.(1);
       }
     }
 
     if (
+      e.code === kb.jump ||
+      e.code === kb.crouch ||
+      e.code === kb.walk ||
       e.code === 'Space' ||
-      e.code === 'ControlLeft' ||
-      e.code === 'ControlRight' ||
-      e.code === 'ShiftLeft' ||
-      e.code === 'ShiftRight'
+      e.code === 'Tab'
     ) {
       e.preventDefault();
     }
 
     this.heldKeys.add(e.code);
     if (!e.repeat) {
-      if (e.code === 'Space') this.jumpLatched = true;
-      if (e.code === 'KeyR') this.reloadLatched = true;
+      if (e.code === kb.jump) this.jumpLatched = true;
+      if (e.code === kb.reload) this.reloadLatched = true;
     }
   };
 
   private readonly handleKeyUp = (e: KeyboardEvent): void => {
     this.heldKeys.delete(e.code);
-    if (e.code === 'Tab' && this.scoreboardHeld) {
+    if (e.code === this.keybinds.scoreboard && this.scoreboardHeld) {
       this.scoreboardHeld = false;
       this.onScoreboardToggle?.(false);
-    }
-    if (e.code === 'KeyE' && this.keyEDownAtMs !== null) {
-      const elapsedMs = performance.now() - this.keyEDownAtMs;
-      this.keyEDownAtMs = null;
-      if (elapsedMs < KERN_TAP_ABILITY_MAX_MS && this.isPointerLocked()) {
-        this.onAbilityKey?.('e');
-      }
     }
   };
 }

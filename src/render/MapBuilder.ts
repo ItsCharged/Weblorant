@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   makeArcticSurface,
+  makeAsphaltSurface,
   makeBrickSurface,
   makeConcreteSurface,
   makeContainerSurface,
@@ -8,17 +9,21 @@ import {
   makeHazardSurface,
   makeIceGlassSurface,
   makeMetalSurface,
+  makePlasterSurface,
   makeStoneSurface,
   makeTerracottaSurface,
   makeTimberSurface,
   makeWaterSurface,
   makeWoodSurface,
+  makeFoliageSurface,
   type SurfaceTexture,
 } from './ProceduralTextures';
 
 type SurfaceKey =
   | 'floor'
+  | 'asphalt'
   | 'concrete'
+  | 'plaster'
   | 'container'
   | 'hazard'
   | 'wood'
@@ -29,7 +34,8 @@ type SurfaceKey =
   | 'terracotta'
   | 'arctic'
   | 'ice'
-  | 'water';
+  | 'water'
+  | 'foliage';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type {
   BlockMaterial,
@@ -76,7 +82,7 @@ export class MapBuilder {
   private mapRoot: THREE.Group | null = null;
 
   // Shared procedural pattern textures (created once, reused across maps)
-  // Hochauflösende Oberflächen (Albedo + Normal-Map, Welt-UV-Kachelung)
+  // Hochauflösende Oberflächen (Albedo + Normal-Map + Roughness-Map, Welt-UV-Kachelung)
   private readonly surfaces: Record<SurfaceKey, SurfaceTexture>;
   private readonly texSprayBoard: THREE.CanvasTexture;
   private readonly texHoloScreen: THREE.CanvasTexture;
@@ -107,7 +113,9 @@ export class MapBuilder {
     this.scene = scene;
     this.surfaces = {
       floor: makeFloorSurface(),
+      asphalt: makeAsphaltSurface(),
       concrete: makeConcreteSurface(),
+      plaster: makePlasterSurface(),
       container: makeContainerSurface(),
       hazard: makeHazardSurface(),
       wood: makeWoodSurface(),
@@ -119,6 +127,7 @@ export class MapBuilder {
       arctic: makeArcticSurface(),
       ice: makeIceGlassSurface(),
       water: makeWaterSurface(),
+      foliage: makeFoliageSurface(),
     };
     this.texSprayBoard = this.makeSprayBoardTexture();
     this.texHoloScreen = this.makeHoloScreenTexture();
@@ -185,8 +194,8 @@ export class MapBuilder {
 
   /**
    * Passt Materialien und Deko an die Grafikqualität an (zur Laufzeit umschaltbar).
-   * - `low`  : keine Normal-Maps, keine Deko, keine anisotrope Filterung
-   * - `high` : Normal-Maps + Deko
+   * - `low`  : keine Normal-/Roughness-Maps, keine Deko, keine anisotrope Filterung
+   * - `high` : Normal-Maps + Roughness-Maps + Deko
    * - `max`  : zusätzlich glattere Metalle/Wasser/Eis für Himmelsreflexionen, 16× Anisotropie
    */
   public setQuality(quality: GraphicsQuality): void {
@@ -195,7 +204,7 @@ export class MapBuilder {
     if (this.detailRoot) this.detailRoot.visible = quality !== 'low';
     const aniso = quality === 'low' ? 1 : quality === 'max' ? 16 : 8;
     for (const s of Object.values(this.surfaces)) {
-      for (const tex of [s.map, s.normalMap]) {
+      for (const tex of [s.map, s.normalMap, s.roughnessMap]) {
         if (tex.anisotropy !== aniso) {
           tex.anisotropy = aniso;
           tex.needsUpdate = true;
@@ -214,21 +223,22 @@ export class MapBuilder {
     const baseMetal = mat.userData.baseMetalness as number;
 
     mat.normalMap = this.quality === 'low' || !surface ? null : surface.normalMap;
+    mat.roughnessMap = this.quality === 'low' || !surface ? null : surface.roughnessMap;
 
     let roughness = baseRough;
     let metalness = baseMetal;
     if (this.quality === 'max') {
       if (kind === 'water_dock') {
-        roughness = 0.06;
+        roughness = 0.08;
         metalness = 0.55;
       } else if (kind === 'ice_glass') {
-        roughness = 0.1;
+        roughness = 0.14;
         metalness = 0.3;
       } else if (kind === 'metal' || kind.startsWith('container_')) {
-        roughness = baseRough * 0.7;
+        roughness = baseRough * 0.75;
         metalness = Math.min(1, baseMetal + 0.15);
       } else if (kind === 'floor' || kind === 'asphalt') {
-        roughness = baseRough * 0.82;
+        roughness = baseRough * 0.86;
       }
     }
     mat.roughness = roughness;
@@ -246,6 +256,7 @@ export class MapBuilder {
     water.map.offset.x = (water.map.offset.x + dt * 0.012) % 1;
     water.map.offset.y = (water.map.offset.y + dt * 0.02) % 1;
     water.normalMap.offset.copy(water.map.offset);
+    water.roughnessMap.offset.copy(water.map.offset);
 
     for (const { prop, group } of this.animatedVisuals) {
       const phase = prop.phase ?? 0;
@@ -318,6 +329,15 @@ export class MapBuilder {
     return this.staticBatchCount;
   }
 
+  private hashBlockId(id: string): number {
+    let h = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      h ^= id.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
   private addBatchedBlockMeshes(parent: THREE.Group, blocks: ReadonlyArray<MapBlock>): void {
     const groups = new Map<string, { kind: BlockMaterial; color: number; geos: THREE.BufferGeometry[] }>();
     const tmpObj = new THREE.Object3D();
@@ -329,13 +349,19 @@ export class MapBuilder {
         group = { kind: block.material, color: block.color, geos: [] };
         groups.set(key, group);
       }
-      const geo = new THREE.BoxGeometry(block.size.x, block.size.y, block.size.z);
-      this.applyWorldUVs(geo, block);
+      // Subdivide large walls/floors so vertex-color macro-variation & ground AO interpolate smoothly
+      const segX = Math.min(16, Math.max(1, Math.ceil(block.size.x / 2.5)));
+      const segY = Math.min(6, Math.max(1, Math.ceil(block.size.y / 2.0)));
+      const segZ = Math.min(16, Math.max(1, Math.ceil(block.size.z / 2.5)));
+      const geo = new THREE.BoxGeometry(block.size.x, block.size.y, block.size.z, segX, segY, segZ);
+
       tmpObj.position.set(block.pos.x, block.pos.y, block.pos.z);
       tmpObj.rotation.set(block.rotX ?? 0, block.rotY ?? 0, block.rotZ ?? 0, 'XYZ');
       tmpObj.scale.set(1, 1, 1);
       tmpObj.updateMatrix();
       geo.applyMatrix4(tmpObj.matrix);
+
+      this.applyWorldUVs(geo, block, true);
       group.geos.push(geo);
     }
 
@@ -372,51 +398,118 @@ export class MapBuilder {
   }
 
   /**
-   * Ersetzt die Standard-UVs (0..1 pro Fläche → gestreckt auf großen Blöcken)
-   * durch Box-projizierte Welt-UVs: 1 Kachel = `tileMeters` Meter, nahtlos über
-   * benachbarte Blöcke hinweg.
+   * Berechnet:
+   * 1. Rotationskorrekte Welt-UVs (vertikal am Fußpunkt des Blocks ausgerichtet + deterministischer
+   *    Phasenversatz pro Block, damit benachbarte Wände/Kisten kein identisches UV-Raster teilen).
+   * 2. WebGPU/WebGL2-kompatible Vertex-Farben (`color`-Attribut):
+   *    - Vertikaler Bodenkontakt-AO- & Verwitterungsverlauf (0.78 nahe y=0 -> 1.0 bei y=2.2m -> 1.03 oben)
+   *    - Aperiodische großskalige Welt-Makro-Variation (8m–25m Wellenlänge, ±7% Helligkeit, ±3% Warm/Kühl)
+   *    - Dezenter Tonwert-Jitter pro Block (±4%)
    */
-  private applyWorldUVs(geo: THREE.BoxGeometry, block: MapBlock): void {
+  private applyWorldUVs(geo: THREE.BoxGeometry, block: MapBlock, isWorldTransformed = false): void {
     const tile = this.getTileMeters(block.material);
-    if (tile <= 0) return;
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const nor = geo.getAttribute('normal') as THREE.BufferAttribute;
     const uv = geo.getAttribute('uv') as THREE.BufferAttribute;
-    const ox = block.pos.x;
-    const oy = block.pos.y;
-    const oz = block.pos.z;
+
+    const hash = this.hashBlockId(block.id);
+    const uPhase = tile > 0 ? ((hash % 1024) / 1024) * tile : 0;
+    const blockJitter = 1.0 + (((hash >>> 10) % 1000) / 500 - 1.0) * 0.04;
+    const bottomY = isWorldTransformed ? block.pos.y - block.size.y * 0.5 : -block.size.y * 0.5;
+    const topY = block.pos.y + block.size.y * 0.5;
+    const isFloorSlab =
+      block.material === 'floor' ||
+      block.material === 'asphalt' ||
+      block.material === 'water_dock' ||
+      topY <= 0.25;
+    const isEmissiveTrim =
+      block.material === 'trim_orange' ||
+      block.material === 'trim_teal' ||
+      block.material === 'holo_screen' ||
+      block.material === 'spray_board';
+
+    const colors = new Float32Array(pos.count * 3);
+
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i) + ox;
-      const y = pos.getY(i) + oy;
-      const z = pos.getZ(i) + oz;
+      const px = pos.getX(i);
+      const py = pos.getY(i);
+      const pz = pos.getZ(i);
+      const wx = isWorldTransformed ? px : px + block.pos.x;
+      const wy = isWorldTransformed ? py : py + block.pos.y;
+      const wz = isWorldTransformed ? pz : pz + block.pos.z;
       const nx = nor.getX(i);
       const ny = nor.getY(i);
       const nz = nor.getZ(i);
-      let u: number;
-      let v: number;
-      if (Math.abs(nx) > 0.5) {
-        u = nx > 0 ? -z : z;
-        v = y;
-      } else if (Math.abs(ny) > 0.5) {
-        u = x;
-        v = ny > 0 ? -z : z;
-      } else {
-        u = nz > 0 ? x : -x;
-        v = y;
+
+      if (tile > 0) {
+        let u: number;
+        let v: number;
+        if (Math.abs(ny) > 0.65) {
+          u = (isWorldTransformed ? wx : px + block.size.x * 0.5) + uPhase;
+          v = (ny > 0 ? -1 : 1) * (isWorldTransformed ? wz : pz + block.size.z * 0.5) + uPhase * 0.618;
+        } else if (Math.abs(nx) >= Math.abs(nz)) {
+          u = (nx > 0 ? -1 : 1) * (isWorldTransformed ? wz : pz + block.size.z * 0.5) + uPhase;
+          v = (isWorldTransformed ? wy : py) - bottomY;
+        } else {
+          u = (nz > 0 ? 1 : -1) * (isWorldTransformed ? wx : px + block.size.x * 0.5) + uPhase;
+          v = (isWorldTransformed ? wy : py) - bottomY;
+        }
+        uv.setXY(i, u / tile, v / tile);
       }
-      uv.setXY(i, u / tile, v / tile);
+
+      if (isEmissiveTrim) {
+        colors[i * 3] = 1;
+        colors[i * 3 + 1] = 1;
+        colors[i * 3 + 2] = 1;
+        continue;
+      }
+
+      // 1. Vertikaler Bodenkontakt-AO & Höhenverlauf
+      let ao = 1.0;
+      if (isFloorSlab) {
+        ao = 0.97 + 0.03 * Math.cos(wx * 0.08) * Math.cos(wz * 0.08);
+      } else if (wy <= 0.25) {
+        ao = 0.78;
+      } else if (wy < 2.2) {
+        const t = (wy - 0.25) / (2.2 - 0.25);
+        const s = t * t * (3 - 2 * t);
+        ao = 0.78 + s * 0.22;
+      } else {
+        const tTop = Math.min(1, (wy - 2.2) / 3.5);
+        ao = 1.0 + tTop * 0.03;
+      }
+
+      // 2. Aperiodisches Welt-Makro-Rauschen (8m–25m Wellenlänge)
+      const n1 =
+        Math.sin(wx * 0.11 + wz * 0.07 + 0.5) * 0.45 +
+        Math.cos(wz * 0.13 - wx * 0.05 + 1.7) * 0.35 +
+        Math.sin((wx + wz) * 0.043 + wy * 0.19 + 2.8) * 0.2;
+      const n2 =
+        Math.sin(wx * 0.037 - wz * 0.041 + 1.1) * 0.6 +
+        Math.cos(wz * 0.029 + wx * 0.031 + 3.4) * 0.4;
+      const macroLum = 1.0 + (n1 * 0.65 + n2 * 0.35) * 0.07;
+      const warmCool = n2 * 0.03;
+
+      const base = ao * macroLum * blockJitter;
+      colors[i * 3] = Math.min(1.12, Math.max(0.6, base * (1.0 + warmCool)));
+      colors[i * 3 + 1] = Math.min(1.12, Math.max(0.6, base));
+      colors[i * 3 + 2] = Math.min(1.12, Math.max(0.6, base * (1.0 - warmCool)));
     }
-    uv.needsUpdate = true;
+
+    if (tile > 0) uv.needsUpdate = true;
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   }
 
   private getTileMeters(kind: BlockMaterial): number {
     switch (kind) {
       case 'floor':
-      case 'asphalt':
         return this.surfaces.floor.tileMeters;
+      case 'asphalt':
+        return this.surfaces.asphalt.tileMeters;
       case 'concrete':
-      case 'wall_light':
         return this.surfaces.concrete.tileMeters;
+      case 'wall_light':
+        return this.surfaces.plaster.tileMeters;
       case 'container_orange':
       case 'container_teal':
       case 'container_slate':
@@ -447,10 +540,10 @@ export class MapBuilder {
     }
   }
 
-  /** Legacy single-block path (kept for interactive / special-case meshes). */
+  /** Legacy single-block path (kept for animated / special-case meshes). */
   public addBlockMesh(parent: THREE.Group, block: MapBlock): void {
     const geo = new THREE.BoxGeometry(block.size.x, block.size.y, block.size.z);
-    this.applyWorldUVs(geo, { ...block, pos: { x: 0, y: 0, z: 0 } });
+    this.applyWorldUVs(geo, block, false);
     this.mapGeometries.push(geo);
 
     const mat = this.getBlockMaterial(block.material, block.color);
@@ -459,6 +552,13 @@ export class MapBuilder {
     mesh.rotation.set(block.rotX ?? 0, block.rotY ?? 0, block.rotZ ?? 0, 'XYZ');
     mesh.name = block.id;
     parent.add(mesh);
+  }
+
+  private blendTowardWhite(hex: number, t: number): number {
+    const r = Math.round(((hex >> 16) & 255) * (1 - t) + 255 * t);
+    const g = Math.round(((hex >> 8) & 255) * (1 - t) + 255 * t);
+    const b = Math.round((hex & 255) * (1 - t) + 255 * t);
+    return (r << 16) | (g << 8) | b;
   }
 
   private getBlockMaterial(kind: BlockMaterial, color: number): THREE.MeshStandardMaterial {
@@ -476,37 +576,45 @@ export class MapBuilder {
 
     switch (kind) {
       case 'floor':
-      case 'asphalt':
         surface = this.surfaces.floor;
         roughness = 0.86;
         metalness = 0.05;
         break;
+      case 'asphalt':
+        surface = this.surfaces.asphalt;
+        roughness = 0.9;
+        metalness = 0.04;
+        break;
       case 'concrete':
-      case 'wall_light':
         surface = this.surfaces.concrete;
+        roughness = 0.84;
+        metalness = 0.05;
+        break;
+      case 'wall_light':
+        surface = this.surfaces.plaster;
         roughness = 0.8;
-        metalness = 0.06;
+        metalness = 0.03;
         break;
       case 'container_orange':
       case 'container_teal':
       case 'container_slate':
         surface = this.surfaces.container;
-        roughness = 0.56;
+        roughness = 0.62;
         metalness = 0.34;
         break;
       case 'metal':
         surface = this.surfaces.metal;
-        roughness = 0.42;
+        roughness = 0.5;
         metalness = 0.62;
         break;
       case 'wood':
         surface = this.surfaces.wood;
-        roughness = 0.76;
+        roughness = 0.8;
         metalness = 0.04;
         break;
       case 'hazard':
         surface = this.surfaces.hazard;
-        roughness = 0.65;
+        roughness = 0.68;
         metalness = 0.15;
         break;
       case 'trim_orange':
@@ -528,39 +636,39 @@ export class MapBuilder {
         break;
       case 'brick_warm':
         surface = this.surfaces.brick;
-        roughness = 0.84;
+        roughness = 0.88;
         metalness = 0.04;
         break;
       case 'stone_sand':
         surface = this.surfaces.stone;
-        roughness = 0.82;
+        roughness = 0.86;
         metalness = 0.04;
         break;
       case 'timber_beam':
         surface = this.surfaces.timber;
-        roughness = 0.74;
+        roughness = 0.78;
         metalness = 0.06;
         break;
       case 'terracotta':
         surface = this.surfaces.terracotta;
-        roughness = 0.68;
+        roughness = 0.72;
         metalness = 0.06;
         break;
       case 'arctic_panel':
         surface = this.surfaces.arctic;
-        roughness = 0.52;
+        roughness = 0.56;
         metalness = 0.28;
         break;
       case 'ice_glass':
         surface = this.surfaces.ice;
-        roughness = 0.2;
+        roughness = 0.24;
         metalness = 0.18;
         emissive = 0x1b5670;
         emissiveIntensity = 0.22;
         break;
       case 'water_dock':
         surface = this.surfaces.water;
-        roughness = 0.22;
+        roughness = 0.24;
         metalness = 0.24;
         emissive = 0x0c3547;
         emissiveIntensity = 0.22;
@@ -573,10 +681,21 @@ export class MapBuilder {
         emissive = 0xffffff;
         emissiveIntensity = 0.62;
         break;
+      case 'foliage':
+        surface = this.surfaces.foliage;
+        roughness = 0.94;
+        metalness = 0.02;
+        break;
     }
 
     const usePureTextureColor =
       kind === 'spray_board' || kind === 'hazard' || kind === 'holo_screen';
+    const preserveMultiHueMortar = kind === 'brick_warm' || kind === 'stone_sand';
+    const matColor = usePureTextureColor
+      ? 0xffffff
+      : preserveMultiHueMortar
+        ? this.blendTowardWhite(color, 0.72)
+        : color;
 
     if (surface) {
       map = surface.map;
@@ -585,15 +704,17 @@ export class MapBuilder {
       kind === 'ice_glass' || kind === 'water_dock' ? 0.35 : kind === 'floor' || kind === 'asphalt' ? 0.55 : 0.85;
 
     const mat = new THREE.MeshStandardMaterial({
-      color: usePureTextureColor ? 0xffffff : color,
+      color: matColor,
       map,
       normalMap: surface ? surface.normalMap : null,
       normalScale: new THREE.Vector2(normalStrength, normalStrength),
+      roughnessMap: surface ? surface.roughnessMap : null,
       emissiveMap,
       roughness,
       metalness,
       emissive,
       emissiveIntensity,
+      vertexColors: true,
     });
     mat.userData.blockKind = kind;
     mat.userData.surface = surface;
@@ -1159,6 +1280,7 @@ export class MapBuilder {
     for (const s of Object.values(this.surfaces)) {
       s.map.dispose();
       s.normalMap.dispose();
+      s.roughnessMap.dispose();
     }
     this.texSprayBoard.dispose();
     this.texHoloScreen.dispose();

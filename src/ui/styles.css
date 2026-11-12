@@ -1,22 +1,22 @@
 :root {
-  --bg-obsidian: #0a1017;
-  --bg-obsidian-alpha: rgba(11, 17, 24, 0.92);
-  --bg-panel: #111a24;
-  --bg-panel-elevated: #172331;
-  --bg-buy-glass: #0e151de8;
-  --border-muted: rgba(145, 175, 205, 0.22);
-  --border-strong: rgba(160, 195, 228, 0.36);
+  --bg-obsidian: #05070c;
+  --bg-obsidian-alpha: #090c13;
+  --bg-panel: #0e1420;
+  --bg-panel-elevated: #141d2e;
+  --bg-buy-glass: #0e1420;
+  --border-muted: #253246;
+  --border-strong: #3b4e6b;
   --accent-amber: #ff6b2b;
-  --accent-coral: #ff5847;
+  --accent-coral: #ff4655;
   --accent-amber-soft: rgba(255, 107, 43, 0.2);
-  --accent-cyan: #18d4c9;
-  --accent-cyan-soft: rgba(24, 212, 201, 0.2);
+  --accent-cyan: #00e5ff;
+  --accent-cyan-soft: rgba(0, 229, 255, 0.2);
   --accent-gold: #ffc44d;
-  --accent-emerald: #38e29d;
-  --text-primary: #f2f7fc;
-  --text-secondary: #9bb0c5;
-  --text-muted: #698096;
-  --danger: #ff4444;
+  --accent-emerald: #00e676;
+  --text-primary: #ffffff;
+  --text-secondary: #dbe4f0;
+  --text-muted: #8b9bb0;
+  --danger: #ff4655;
   --font-ui: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'Cascadia Mono', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
 }
@@ -92,10 +92,9 @@ body {
   padding: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 42%, rgba(24, 212, 201, 0.11), transparent 54%),
-    radial-gradient(circle at 14% 16%, rgba(255, 107, 43, 0.12), transparent 44%),
-    radial-gradient(circle at 88% 82%, rgba(24, 212, 201, 0.08), transparent 46%),
-    linear-gradient(165deg, #070c12 0%, #0d1621 52%, #091018 100%);
+    radial-gradient(circle at center, rgba(5, 7, 12, 0.65) 0%, rgba(5, 7, 12, 0.95) 100%),
+    url('/assets/menu-portal-bg.png') center/cover no-repeat,
+    #05070c;
 }
 
 .client-shell {
@@ -116,9 +115,8 @@ body {
   grid-template-columns: auto 1fr auto;
   align-items: stretch;
   gap: 20px;
-  background: rgba(9, 15, 23, 0.94);
-  border-bottom: 1px solid var(--border-muted);
-  backdrop-filter: blur(10px);
+  background: #090c13;
+  border-bottom: 2px solid var(--border-muted);
 }
 
 .client-brand {
@@ -400,28 +398,128 @@ body {
 .play-left-column {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 12px;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
+/* Sub-Menu Navigation Bar (MATCH | TRUPP & RAUM | TRAINING) */
+.play-subnav-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  background: #090c13;
+  padding: 4px;
+  border: 1px solid var(--border-muted);
+}
+
+.play-subnav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 4px;
+  background: #0e1420;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+}
+
+.play-subnav-btn:hover {
+  background: #141d2e;
+  color: #ffffff;
+}
+
+.play-subnav-btn.is-active,
+.play-subnav-btn[aria-selected='true'] {
+  background: #141d2e;
+  border-color: var(--accent-cyan);
+  border-bottom: 3px solid var(--accent-cyan);
+  color: #ffffff;
+}
+
+.subnav-kicker {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--accent-cyan);
+}
+
+.subnav-title {
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Tactical Sub-view Panel & Section Header */
+.play-subview-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.play-subview-panel[hidden] {
+  display: none !important;
+}
+
+.tactical-section-head {
+  padding: 6px 10px;
+  background: #090c13;
+  border-left: 3px solid var(--accent-cyan);
+  border-top: 1px solid var(--border-muted);
+  border-right: 1px solid var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.tactical-section-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--accent-cyan);
+}
+
+.tactical-section-title {
+  margin: 2px 0 0;
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.play-training-info {
+  font-size: 0.74rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  padding: 6px 8px;
+  background: #090c13;
+  border-left: 2px solid var(--border-muted);
+}
+
 .play-mode-card {
   text-align: left;
   padding: 13px 15px;
-  background:
-    linear-gradient(135deg, rgba(24, 212, 201, 0.16) 0%, rgba(16, 26, 38, 0.95) 68%);
-  border: 1px solid rgba(24, 212, 201, 0.45);
+  background: #0e1420;
+  border: 1px solid var(--border-muted);
   border-left: 4px solid var(--accent-cyan);
-  color: var(--text-primary);
+  color: #ffffff;
   cursor: pointer;
   clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
 }
 
 .play-mode-card:hover {
   border-color: var(--accent-cyan);
-  background:
-    linear-gradient(135deg, rgba(24, 212, 201, 0.25) 0%, rgba(20, 33, 47, 0.98) 72%);
+  background: #141d2e;
 }
 
 .play-mode-card:focus-visible {
@@ -440,26 +538,27 @@ body {
 .play-mode-kicker {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: 900;
+  letter-spacing: 0.15em;
   color: var(--accent-cyan);
 }
 
 .play-mode-map-tag {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   padding: 2px 7px;
-  background: rgba(255, 107, 43, 0.18);
-  border: 1px solid rgba(255, 107, 43, 0.45);
-  color: #ff9c70;
+  background: #1b1210;
+  border: 1px solid var(--accent-coral);
+  color: var(--accent-coral);
 }
 
 .play-mode-title {
   font-size: 1.05rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  color: #ffffff;
 }
 
 .play-mode-sub {
@@ -469,8 +568,8 @@ body {
 }
 
 .play-side-card {
-  padding: 12px 14px;
-  background: rgba(14, 22, 32, 0.9);
+  padding: 13px 15px;
+  background: #0e1420;
   border: 1px solid var(--border-muted);
   display: flex;
   flex-direction: column;
@@ -478,15 +577,15 @@ body {
 }
 
 .play-side-card.is-room-active {
-  border-color: rgba(24, 212, 201, 0.42);
+  border-color: var(--accent-cyan);
 }
 
 .play-side-heading {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--text-secondary);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: #ffffff;
 }
 
 .lobby-field {
@@ -1162,12 +1261,13 @@ body {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 18px;
-  background: rgba(11, 18, 27, 0.92);
+  background: #090c13;
   border: 1px solid var(--border-muted);
 }
 
 .lobby-footer-status {
   font-size: 0.82rem;
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -1183,7 +1283,7 @@ body {
   font-family: var(--font-ui);
   font-size: 0.92rem;
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   border: 1px solid transparent;
   cursor: pointer;
@@ -1191,25 +1291,25 @@ body {
 }
 
 .play-primary-cta.is-coral {
-  background: linear-gradient(135deg, #ff5847 0%, #ff7a33 100%);
-  border-color: #ff9d73;
-  color: #0b0f14;
+  background: #ff4655;
+  border-color: #ff7682;
+  color: #05070c;
 }
 
 .play-primary-cta.is-coral:hover:not(:disabled) {
-  filter: brightness(1.08);
+  filter: brightness(1.12);
 }
 
 .play-primary-cta.is-cyan {
-  background: linear-gradient(135deg, #18d4c9 0%, #14b5ab 100%);
-  border-color: #7df5ed;
-  color: #061015;
+  background: #00e5ff;
+  border-color: #6effff;
+  color: #05070c;
 }
 
 .play-primary-cta.is-cyan.is-ready-active {
-  background: rgba(56, 226, 157, 0.2);
-  border-color: var(--accent-emerald);
-  color: var(--accent-emerald);
+  background: #00e676;
+  border-color: #69f0ae;
+  color: #05070c;
 }
 
 .play-primary-cta:disabled {
@@ -1219,7 +1319,7 @@ body {
 
 /* Right Squad & Presence Rail */
 .client-squad-rail {
-  background: rgba(9, 14, 21, 0.92);
+  background: #090c13;
   border-left: 1px solid var(--border-muted);
   display: flex;
   flex-direction: column;
@@ -1314,14 +1414,13 @@ dialog.lobby-mode-drawer {
   max-height: 100dvh;
   border: none;
   border-right: 2px solid var(--accent-cyan);
-  background: #0c141e;
-  color: var(--text-primary);
-  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.72);
+  background: #090c13;
+  color: #ffffff;
+  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.85);
 }
 
 dialog.lobby-mode-drawer::backdrop {
-  background: rgba(4, 8, 13, 0.72);
-  backdrop-filter: blur(5px);
+  background: rgba(4, 7, 12, 0.85);
 }
 
 .mode-drawer-inner {
@@ -1335,8 +1434,8 @@ dialog.lobby-mode-drawer::backdrop {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid var(--border-muted);
-  background: rgba(16, 26, 38, 0.95);
+  border-bottom: 2px solid var(--border-muted);
+  background: #0e1420;
 }
 
 .mode-drawer-kicker {
@@ -1471,7 +1570,7 @@ dialog.lobby-mode-drawer::backdrop {
    ============================================================================ */
 
 .client-surface-card {
-  background: rgba(14, 22, 32, 0.92);
+  background: #0e1420;
   border: 1px solid var(--border-muted);
   padding: 18px 20px;
   display: flex;
@@ -1485,15 +1584,15 @@ dialog.lobby-mode-drawer::backdrop {
   justify-content: space-between;
   gap: 12px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(145, 175, 205, 0.16);
+  border-bottom: 2px solid var(--border-muted);
 }
 
 .surface-kicker {
   display: block;
   font-family: var(--font-mono);
   font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  font-weight: 900;
+  letter-spacing: 0.15em;
   color: var(--accent-cyan);
 }
 
@@ -1501,16 +1600,18 @@ dialog.lobby-mode-drawer::backdrop {
   margin: 3px 0 0;
   font-size: 1.15rem;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+  text-transform: uppercase;
 }
 
 .surface-xp-badge {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  font-weight: 800;
+  font-weight: 900;
   padding: 4px 10px;
-  background: rgba(24, 212, 201, 0.12);
-  border: 1px solid rgba(24, 212, 201, 0.4);
+  background: #141d2e;
+  border: 1px solid var(--accent-cyan);
   color: var(--accent-cyan);
 }
 
@@ -1625,9 +1726,8 @@ dialog.lobby-mode-drawer::backdrop {
 
 .objectives-showcase-card {
   justify-content: space-between;
-  background:
-    radial-gradient(circle at 60% 42%, rgba(24, 212, 201, 0.16), transparent 62%),
-    rgba(14, 22, 32, 0.95);
+  background: #0e1420;
+  border: 1px solid var(--border-muted);
 }
 
 .showcase-kicker-row {
@@ -1855,10 +1955,8 @@ dialog.lobby-mode-drawer::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at 50% 45%, rgba(24, 212, 201, 0.18), transparent 64%),
-    rgba(10, 17, 26, 0.72);
-  border: 1px solid rgba(145, 175, 205, 0.18);
+  background: #090c13;
+  border: 1px solid var(--border-muted);
   overflow: hidden;
 }
 
@@ -1888,7 +1986,7 @@ dialog.lobby-mode-drawer::backdrop {
 }
 
 .spec-right-dossier {
-  background: rgba(14, 22, 32, 0.94);
+  background: #0e1420;
   border: 1px solid var(--border-muted);
   padding: 18px 20px;
   display: flex;
@@ -3852,8 +3950,7 @@ progress.shard-progress::-moz-progress-bar {
   inset: 0;
   z-index: 45;
   pointer-events: auto;
-  background: var(--bg-buy-glass);
-  backdrop-filter: blur(12px);
+  background: rgba(5, 7, 12, 0.94);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4488,8 +4585,7 @@ dialog.shard-dialog {
 }
 
 dialog.shard-dialog::backdrop {
-  background: rgba(4, 8, 13, 0.76);
-  backdrop-filter: blur(6px);
+  background: rgba(4, 7, 12, 0.85);
 }
 
 .dialog-header {
@@ -4870,8 +4966,7 @@ input[type='range'].shard-slider::-moz-range-thumb {
   inset: 0;
   z-index: 55;
   pointer-events: auto;
-  background: rgba(8, 13, 20, 0.86);
-  backdrop-filter: blur(10px);
+  background: rgba(5, 7, 12, 0.92);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4880,7 +4975,7 @@ input[type='range'].shard-slider::-moz-range-thumb {
 
 .shard-matchend-overlay[data-mode='scoreboard'] {
   pointer-events: none;
-  background: rgba(8, 13, 20, 0.68);
+  background: rgba(5, 7, 12, 0.78);
 }
 
 .matchend-shell {

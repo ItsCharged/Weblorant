@@ -251,8 +251,8 @@ const WERKSTADT_BLOCKS: MapBlock[] = [
   // Decorative canal water strips (non-colliding, framed by half-height stone parapets)
   {
     id: 'ws_canal_water_south',
-    pos: { x: 0, y: 0.03, z: 19.0 },
-    size: { x: 5.2, y: 0.04, z: 9.2 },
+    pos: { x: 0, y: 0.005, z: 19.0 },
+    size: { x: 5.2, y: 0.01, z: 9.2 },
     color: 0x2b7285,
     material: 'water_dock',
     collider: false,
@@ -260,8 +260,8 @@ const WERKSTADT_BLOCKS: MapBlock[] = [
   },
   {
     id: 'ws_canal_water_center',
-    pos: { x: 0, y: 0.03, z: 2.0 },
-    size: { x: 5.2, y: 0.04, z: 10.6 },
+    pos: { x: 0, y: 0.005, z: 2.0 },
+    size: { x: 5.2, y: 0.01, z: 10.6 },
     color: 0x2b7285,
     material: 'water_dock',
     collider: false,
@@ -269,8 +269,8 @@ const WERKSTADT_BLOCKS: MapBlock[] = [
   },
   {
     id: 'ws_canal_water_north',
-    pos: { x: 0, y: 0.03, z: -15.5 },
-    size: { x: 5.2, y: 0.04, z: 9.6 },
+    pos: { x: 0, y: 0.005, z: -15.5 },
+    size: { x: 5.2, y: 0.01, z: 9.6 },
     color: 0x2b7285,
     material: 'water_dock',
     collider: false,
@@ -710,6 +710,33 @@ const WERKSTADT_BLOCKS: MapBlock[] = [
     color: 0xb85e43,
     material: 'brick_warm',
     label: 'Verteidiger-Rotation B Mauer',
+  },
+  // Süd-Markt Vorplatz Kistenstapel (Angreifer-Vorplatz z = +40)
+  {
+    id: 'ws_spawn_s_crate_stack_west',
+    pos: { x: -20.5, y: 0.7, z: 40.0 },
+    size: { x: 2.4, y: 1.4, z: 2.4 },
+    color: 0x8b623c,
+    material: 'timber_beam',
+    label: 'Marktplatz Kistenstapel West',
+  },
+  {
+    id: 'ws_spawn_s_crate_stack_east',
+    pos: { x: 20.5, y: 0.7, z: 40.0 },
+    size: { x: 2.4, y: 1.4, z: 2.4 },
+    color: 0x8b623c,
+    material: 'timber_beam',
+    label: 'Marktplatz Kistenstapel Ost',
+  },
+  // Nord-Kontor Rotations-Deckung West
+  {
+    id: 'ws_def_a_rotation_screen',
+    pos: { x: -33.5, y: 1.35, z: -29.8 },
+    size: { x: 5.6, y: 2.7, z: 2.2 },
+    rotY: -0.15,
+    color: 0xb85e43,
+    material: 'brick_warm',
+    label: 'Verteidiger-Rotation A Mauer',
   },
 ];
 

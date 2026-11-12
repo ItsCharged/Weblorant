@@ -1,8 +1,17 @@
+import {
+  DEFAULT_KEYBINDS,
+  findKeybindConflicts,
+  formatKeyCodeLabel,
+  KEYBIND_ACTION_META,
+  type KeybindCategory,
+} from '../core/Config';
 import type {
   CharacterId,
   GameSettings,
   GraphicsQuality,
   KernSnapshot,
+  KeybindAction,
+  KeybindMap,
   LoadoutSlot,
   MapId,
   NetSimConfig,
@@ -161,6 +170,11 @@ export interface HudFrameState {
   aliveTargetsOffline?: number;
   totalTargetsOffline?: number;
   offlineTotalKills?: number;
+  offlineLoadout?: {
+    primaryWeapon: WeaponId | null;
+    secondaryWeapon: WeaponId;
+    activeSlot: LoadoutSlot;
+  };
   onlineContext: OnlineHudContext | null;
 }
 
@@ -315,6 +329,14 @@ export class HudOverlay {
   private readonly netSimToolbarEl: HTMLElement;
   private readonly netSimButtons: HTMLButtonElement[] = [];
 
+  // Keybindings Editor refs
+  private readonly keybindsContainerEl: HTMLElement;
+  private readonly keybindConflictBannerEl: HTMLElement;
+  private readonly btnResetKeybinds: HTMLButtonElement;
+  private readonly controlsStripEl: HTMLElement;
+  private capturingKeybindAction: KeybindAction | null = null;
+  private readonly keybindButtons = new Map<KeybindAction, HTMLButtonElement>();
+
   private hitmarkerTimer = 0;
   private hitmarkerDuration = 0.16;
 
@@ -322,6 +344,7 @@ export class HudOverlay {
     this.settings = {
       ...initialSettings,
       crosshair: { ...initialSettings.crosshair },
+      keybinds: { ...(initialSettings.keybinds ?? DEFAULT_KEYBINDS) },
     };
     this.callbacks = callbacks;
 
@@ -380,15 +403,15 @@ export class HudOverlay {
       <!-- LEFT KEY-HINT PILLS & INTERACTIVE F1 / F2 PANELS -->
       <aside class="hud-left-hints" id="hud-left-hints" aria-label="Tastenhinweise">
         <div class="hud-key-pill" id="hud-hint-f1">
-          <kbd>F1</kbd>
+          <kbd id="hud-kbd-f1">F1</kbd>
           <span>Fähigkeits-Info</span>
         </div>
         <div class="hud-key-pill" id="hud-hint-f2">
-          <kbd>F2</kbd>
+          <kbd id="hud-kbd-f2">F2</kbd>
           <span>Spezialist wechseln</span>
         </div>
         <div class="hud-key-pill is-buy" id="hud-buy-hint-pill">
-          <kbd>B</kbd>
+          <kbd id="hud-kbd-buy">B</kbd>
           <span>Kaufmenü</span>
         </div>
       </aside>
@@ -432,7 +455,7 @@ export class HudOverlay {
       </div>
 
       <div class="hud-kern-action-box" id="hud-kern-action-box" hidden>
-        <div class="hud-kern-prompt" id="hud-kern-prompt">[4 / E HALTEN] KERN PLATZIEREN</div>
+        <div class="hud-kern-prompt" id="hud-kern-prompt">[4 HALTEN] KERN PLATZIEREN</div>
         <div class="hud-kern-progress-wrap" id="hud-kern-progress-wrap">
           <progress
             id="hud-kern-progress"
@@ -487,7 +510,7 @@ export class HudOverlay {
           <div class="hud-ability-bar" id="hud-ability-bar"></div>
           <div class="hud-kern-slot-tile" id="hud-kern-carrier-pill" hidden>
             <span class="ability-slot-svg">${getKernSvg()}</span>
-            <span class="ability-keycap">4 / E</span>
+            <span class="ability-keycap" id="hud-kern-slot-keycap">4</span>
             <span class="ability-pips-row">KERN</span>
           </div>
         </div>
@@ -661,7 +684,7 @@ export class HudOverlay {
         </div>
 
         <div id="dialog-offline-arsenal-section">
-          <h2 class="dialog-section-label">Bewaffnung (Standard: [1] Lanze · Tasten 1–6 im Training)</h2>
+          <h2 class="dialog-section-label">Bewaffnung (Standard: [1] Lanze · [1] Primär / [2] Sekundär / [3] Klinge)</h2>
           <div class="arsenal-row" id="dialog-arsenal-row"></div>
         </div>
 
@@ -769,18 +792,21 @@ export class HudOverlay {
           </div>
         </div>
 
-        <div class="controls-strip">
-          <span><kbd class="keycap">WASD</kbd>Bewegung</span>
-          <span><kbd class="keycap">Q / E / X</kbd>Fähigkeiten</span>
-          <span><kbd class="keycap">F1</kbd>Fähigkeits-Info</span>
-          <span><kbd class="keycap">F2</kbd>Spezialist (Training)</span>
-          <span><kbd class="keycap">B</kbd>Kaufmenü</span>
-          <span><kbd class="keycap">1–3</kbd>Waffe / Klinge</span>
-          <span><kbd class="keycap">4 / E</kbd>Kern</span>
-          <span><kbd class="keycap">Tab</kbd>Statistik</span>
-          <span><kbd class="keycap">F3</kbd>Diagnose</span>
-          <span><kbd class="keycap">ESC</kbd>Menü</span>
-        </div>
+        <section class="keybinds-section" aria-labelledby="keybinds-section-title">
+          <div class="keybinds-header-row">
+            <div>
+              <h2 class="dialog-section-label" id="keybinds-section-title">Tastenbelegung (Anpassen &amp; Konfliktprüfung)</h2>
+              <p class="keybinds-sub">Klicke auf eine Taste und drücke die gewünschte neue Taste ([ESC] bricht ab). Doppelbelegungen werden automatisch bereinigt.</p>
+            </div>
+            <button type="button" id="btn-reset-keybinds" class="keybind-reset-btn">
+              AUF STANDARD ZURÜCKSETZEN
+            </button>
+          </div>
+          <div class="keybind-conflict-banner" id="keybind-conflict-banner" role="status" aria-live="polite"></div>
+          <div class="keybinds-categories-grid" id="keybinds-container"></div>
+        </section>
+
+        <div class="controls-strip" id="dialog-controls-strip"></div>
       </div>
     `;
     container.appendChild(this.dialog);
@@ -808,12 +834,13 @@ export class HudOverlay {
     });
 
     const arsenalRow = this.dialog.querySelector('#dialog-arsenal-row') as HTMLElement;
-    HUD_WEAPON_SLOTS.forEach((wId, idx) => {
+    HUD_WEAPON_SLOTS.forEach((wId) => {
       const stats = WEAPONS[wId];
+      const slotTag = wId === 'funke' || wId === 'bolzer' ? '[Slot 2]' : '[Slot 1]';
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `arsenal-btn ${wId === 'lanze' ? 'is-equipped' : ''}`;
-      btn.textContent = `[${idx + 1}] ${stats.name}`;
+      btn.textContent = `${slotTag} ${stats.name}`;
       btn.addEventListener('click', () => {
         this.callbacks.onSelectWeapon(wId);
         this.highlightWeapon(wId);
@@ -860,10 +887,193 @@ export class HudOverlay {
       this.netSimToolbarEl.querySelectorAll<HTMLButtonElement>('.netsim-btn')
     );
 
+    this.keybindsContainerEl = this.dialog.querySelector('#keybinds-container') as HTMLElement;
+    this.keybindConflictBannerEl = this.dialog.querySelector(
+      '#keybind-conflict-banner'
+    ) as HTMLElement;
+    this.btnResetKeybinds = this.dialog.querySelector('#btn-reset-keybinds') as HTMLButtonElement;
+    this.controlsStripEl = this.dialog.querySelector('#dialog-controls-strip') as HTMLElement;
+
+    this.buildKeybindsEditor();
     this.setupListeners();
     this.setupNetSimToolbar();
     this.updateCrosshairGeometry(0);
     this.renderAbilityBar('ryo', null, 0);
+    this.syncKeybindUiLabels();
+  }
+
+  private buildKeybindsEditor(): void {
+    const categories: Array<{ id: KeybindCategory; title: string }> = [
+      { id: 'movement', title: 'BEWEGUNG & HALTUNG' },
+      { id: 'combat', title: 'WAFFEN & VISIERUNG' },
+      { id: 'abilities', title: 'FÄHIGKEITEN & KERN' },
+      { id: 'menus', title: 'TAKTIK-MENÜS & ANZEIGEN' },
+    ];
+
+    this.keybindsContainerEl.innerHTML = '';
+    this.keybindButtons.clear();
+
+    for (const cat of categories) {
+      const box = document.createElement('div');
+      box.className = 'keybind-category-card';
+      const heading = document.createElement('h3');
+      heading.className = 'keybind-cat-heading';
+      heading.textContent = cat.title;
+      box.appendChild(heading);
+
+      const list = document.createElement('div');
+      list.className = 'keybind-rows-list';
+
+      const items = KEYBIND_ACTION_META.filter((m) => m.category === cat.id);
+      for (const meta of items) {
+        const row = document.createElement('div');
+        row.className = 'keybind-row';
+        row.dataset.keybindAction = meta.action;
+
+        const copyWrap = document.createElement('div');
+        copyWrap.className = 'keybind-row-copy';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'keybind-row-label';
+        labelEl.textContent = meta.label;
+        const descEl = document.createElement('span');
+        descEl.className = 'keybind-row-desc';
+        descEl.textContent = meta.description;
+        copyWrap.append(labelEl, descEl);
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = `btn-keybind-${meta.action}`;
+        btn.className = 'keybind-capture-btn';
+        btn.dataset.keybindAction = meta.action;
+        btn.addEventListener('click', () => {
+          this.startKeybindCapture(meta.action);
+        });
+
+        row.append(copyWrap, btn);
+        list.appendChild(row);
+        this.keybindButtons.set(meta.action, btn);
+      }
+
+      box.appendChild(list);
+      this.keybindsContainerEl.appendChild(box);
+    }
+
+    this.btnResetKeybinds.addEventListener('click', () => {
+      this.cancelKeybindCapture();
+      this.settings.keybinds = { ...DEFAULT_KEYBINDS };
+      this.renderedAbilityKey = '';
+      this.lastLoadoutSvgKey = '';
+      this.lastF1CharRendered = null;
+      this.lastF2CharRendered = null;
+      this.syncKeybindUiLabels();
+      this.callbacks.onSettingsChange(this.cloneSettings());
+    });
+
+    window.addEventListener(
+      'keydown',
+      (e: KeyboardEvent) => {
+        if (!this.capturingKeybindAction || !this.dialog.open) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.code === 'Escape') {
+          this.cancelKeybindCapture();
+          return;
+        }
+
+        const targetAction = this.capturingKeybindAction;
+        const newCode = e.code;
+        if (!newCode) return;
+
+        // Automatically swap if another action already uses `newCode` so zero conflicts ever occur
+        const previousCode = this.settings.keybinds[targetAction];
+        for (const meta of KEYBIND_ACTION_META) {
+          if (meta.action !== targetAction && this.settings.keybinds[meta.action] === newCode) {
+            this.settings.keybinds[meta.action] = previousCode;
+          }
+        }
+        this.settings.keybinds[targetAction] = newCode;
+        this.capturingKeybindAction = null;
+
+        this.renderedAbilityKey = '';
+        this.lastLoadoutSvgKey = '';
+        this.lastF1CharRendered = null;
+        this.lastF2CharRendered = null;
+        this.syncKeybindUiLabels();
+        this.callbacks.onSettingsChange(this.cloneSettings());
+      },
+      true
+    );
+  }
+
+  private startKeybindCapture(action: KeybindAction): void {
+    if (this.capturingKeybindAction === action) {
+      this.cancelKeybindCapture();
+      return;
+    }
+    this.capturingKeybindAction = action;
+    this.syncKeybindUiLabels();
+  }
+
+  private cancelKeybindCapture(): void {
+    if (!this.capturingKeybindAction) return;
+    this.capturingKeybindAction = null;
+    this.syncKeybindUiLabels();
+  }
+
+  private syncKeybindUiLabels(): void {
+    const kb: KeybindMap = this.settings.keybinds;
+    const conflicts = findKeybindConflicts(kb);
+    const conflictingActions = new Set<KeybindAction>();
+    for (const c of conflicts) {
+      for (const a of c.actions) {
+        conflictingActions.add(a);
+      }
+    }
+
+    for (const [action, btn] of this.keybindButtons.entries()) {
+      const isCapturing = this.capturingKeybindAction === action;
+      const hasConflict = conflictingActions.has(action);
+      btn.dataset.keybindCapture = isCapturing ? 'true' : 'false';
+      btn.classList.toggle('is-capturing', isCapturing);
+      btn.classList.toggle('is-conflict', hasConflict);
+      btn.textContent = isCapturing ? 'TASTE DRÜCKEN…' : formatKeyCodeLabel(kb[action]);
+    }
+
+    if (conflicts.length === 0) {
+      this.keybindConflictBannerEl.dataset.state = 'ok';
+      this.keybindConflictBannerEl.textContent =
+        '✓ Alle 22 Aktionen sind eindeutig belegt · Keine Tastenkonflikte.';
+    } else {
+      this.keybindConflictBannerEl.dataset.state = 'warn';
+      const detail = conflicts
+        .map((c) => `${formatKeyCodeLabel(c.code)} (${c.actions.length}×)`)
+        .join(', ');
+      this.keybindConflictBannerEl.textContent = `⚠ Doppelbelegung erkannt: ${detail}`;
+    }
+
+    // Update live HUD keycap pills
+    const kbdF1 = this.hudRoot.querySelector('#hud-kbd-f1');
+    if (kbdF1) kbdF1.textContent = formatKeyCodeLabel(kb.abilityInfo);
+    const kbdF2 = this.hudRoot.querySelector('#hud-kbd-f2');
+    if (kbdF2) kbdF2.textContent = formatKeyCodeLabel(kb.specialistSelect);
+    const kbdBuy = this.hudRoot.querySelector('#hud-kbd-buy');
+    if (kbdBuy) kbdBuy.textContent = formatKeyCodeLabel(kb.buyMenu);
+    const kernKeycap = this.hudRoot.querySelector('#hud-kern-slot-keycap');
+    if (kernKeycap) kernKeycap.textContent = formatKeyCodeLabel(kb.kernInteract);
+
+    this.controlsStripEl.innerHTML = `
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.moveForward)}/${formatKeyCodeLabel(kb.moveLeft)}/${formatKeyCodeLabel(kb.moveBack)}/${formatKeyCodeLabel(kb.moveRight)}</kbd>Bewegung</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.abilityQ)} / ${formatKeyCodeLabel(kb.abilityE)} / ${formatKeyCodeLabel(kb.abilityUlt)}</kbd>Fähigkeiten</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.abilityInfo)}</kbd>Fähigkeits-Info</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.specialistSelect)}</kbd>Spezialist (Training)</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.buyMenu)}</kbd>Kaufmenü</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.slot1)}–${formatKeyCodeLabel(kb.slot3)}</kbd>Waffe / Klinge</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.kernInteract)}</kbd>Kern</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.scoreboard)}</kbd>Statistik</span>
+      <span><kbd class="keycap">${formatKeyCodeLabel(kb.debugOverlay)}</kbd>Diagnose</span>
+      <span><kbd class="keycap">ESC</kbd>Menü</span>
+    `;
   }
 
   private setupListeners(): void {

@@ -21,7 +21,8 @@ export type BlockMaterial =
   | 'arctic_panel'
   | 'ice_glass'
   | 'water_dock'
-  | 'holo_screen';
+  | 'holo_screen'
+  | 'foliage';
 
 export type MapTheme = 'dockyard' | 'range' | 'oldtown' | 'arctic';
 

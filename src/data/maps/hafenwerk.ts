@@ -250,8 +250,8 @@ const HAFENWERK_BLOCKS: MapBlock[] = [
     4.6,
     0.0,
     0.3,
-    0xd48b28,
-    'hazard',
+    0x616e7a,
+    'concrete',
     'Aufgang Mitte-Podest',
   ),
   // North-Mid cover wall preventing raw spawn-to-spawn sightline
@@ -348,8 +348,8 @@ const HAFENWERK_BLOCKS: MapBlock[] = [
     -0.8,
     0.0,
     0.34,
-    0xd48b28,
-    'hazard',
+    0x63707c,
+    'concrete',
     'A-Kurz Rampe zur A-Brücke',
   ),
   makeRampZ(
@@ -503,8 +503,8 @@ const HAFENWERK_BLOCKS: MapBlock[] = [
     2.2,
     0.0,
     0.34,
-    0xd48b28,
-    'hazard',
+    0x63707c,
+    'concrete',
     'Aufgang B-Rampe Süd',
   ),
   makeRampZ(
@@ -606,6 +606,41 @@ const HAFENWERK_BLOCKS: MapBlock[] = [
     color: 0x3b4e61,
     material: 'container_slate',
     label: 'Verteidiger-Zugang B Container',
+  },
+  // Süd-Hof Taktische Kiste & Container-Deckung (Angreifer-Hof z = +42)
+  {
+    id: 'hw_spawn_s_courtyard_crates',
+    pos: { x: -21.0, y: 0.7, z: 42.0 },
+    size: { x: 2.4, y: 1.4, z: 2.4 },
+    color: 0xb9854c,
+    material: 'wood',
+    label: 'Süd-Hof Deckungskisten West',
+  },
+  {
+    id: 'hw_spawn_s_courtyard_crate_hi',
+    pos: { x: -21.0, y: 1.9, z: 42.0 },
+    size: { x: 1.4, y: 1.0, z: 1.4 },
+    color: 0x3b4e61,
+    material: 'container_slate',
+    label: 'Süd-Hof Stapelkiste',
+  },
+  {
+    id: 'hw_spawn_s_courtyard_crates_east',
+    pos: { x: 21.0, y: 0.7, z: 42.0 },
+    size: { x: 2.4, y: 1.4, z: 2.4 },
+    color: 0xb9854c,
+    material: 'wood',
+    label: 'Süd-Hof Deckungskisten Ost',
+  },
+  // Nord-Hof / Verteidiger-Zugang A Container-Deckung
+  {
+    id: 'hw_def_a_rotation_cover',
+    pos: { x: -34.5, y: 1.35, z: -31.0 },
+    size: { x: 6.2, y: 2.7, z: 2.8 },
+    rotY: -0.16,
+    color: 0x2c6f7a,
+    material: 'container_teal',
+    label: 'Verteidiger-Zugang A Container',
   },
 
   // =========================================================================

@@ -118,6 +118,12 @@ export class Minimap {
     this.renderBase(true);
   }
 
+  public resize(): void {
+    this.resizeBacking();
+    this.computeProjection();
+    this.renderBase(true, this.lastBarriersActive ?? false);
+  }
+
   private resizeBacking(): void {
     this.dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
     const px = Math.round(CSS_SIZE * this.dpr);

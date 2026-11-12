@@ -109,7 +109,7 @@ const QUALITY_LIGHT: Record<
   { sun: number; hemi: number; fill: number; ambient: number; env: number }
 > = {
   low: { sun: 1, hemi: 1, fill: 1, ambient: 1, env: 0 },
-  high: { sun: 1, hemi: 1, fill: 1, ambient: 1, env: 0 },
+  high: { sun: 1.25, hemi: 0.85, fill: 0.55, ambient: 0.25, env: 0.35 },
   max: { sun: 1.5, hemi: 0.6, fill: 0.45, ambient: 0.35, env: 0.6 },
 };
 

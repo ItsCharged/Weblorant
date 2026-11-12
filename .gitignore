@@ -6,3 +6,4 @@ dist/
 /*.png
 *.log
 .DS_Store
+.agents/

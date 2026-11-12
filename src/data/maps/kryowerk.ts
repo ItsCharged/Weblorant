@@ -227,8 +227,8 @@ const KRYOWERK_BLOCKS: MapBlock[] = [
     6.9,
     0.0,
     0.3,
-    0xd48b28,
-    'hazard',
+    0xcad8e6,
+    'arctic_panel',
     'Aufgang Mittel-Röhre',
   ),
   {
@@ -345,8 +345,8 @@ const KRYOWERK_BLOCKS: MapBlock[] = [
     0.4,
     0.0,
     0.34,
-    0xd48b28,
-    'hazard',
+    0xcad8e6,
+    'arctic_panel',
     'Aufgang Reaktor-Galerie Süd',
   ),
   makeRampZ(
@@ -513,8 +513,8 @@ const KRYOWERK_BLOCKS: MapBlock[] = [
     1.4,
     0.0,
     0.34,
-    0xd48b28,
-    'hazard',
+    0xcad8e6,
+    'arctic_panel',
     'Aufgang Kran-Podest Süd',
   ),
   makeRampZ(
@@ -604,6 +604,33 @@ const KRYOWERK_BLOCKS: MapBlock[] = [
     color: 0x3b4e61,
     material: 'container_slate',
     label: 'Verteidiger-Kranweg Container',
+  },
+  // Süd-Hof Kryo-Lagerkisten & Versorgungsstapel (Angreifer-Hangar Vorplatz)
+  {
+    id: 'kw_spawn_s_courtyard_pod',
+    pos: { x: -20.5, y: 0.8, z: 39.5 },
+    size: { x: 2.4, y: 1.6, z: 2.4 },
+    color: 0xdce6f0,
+    material: 'arctic_panel',
+    label: 'Kryo-Depot Pod West',
+  },
+  {
+    id: 'kw_spawn_s_courtyard_crate',
+    pos: { x: 20.5, y: 0.7, z: 39.5 },
+    size: { x: 2.4, y: 1.4, z: 2.4 },
+    color: 0x2c6f7a,
+    material: 'container_teal',
+    label: 'Kryo-Depot Container Ost',
+  },
+  // Nord-Forschungsdock Rotations-Deckung West
+  {
+    id: 'kw_def_a_rotation_container',
+    pos: { x: -34.0, y: 1.35, z: -30.4 },
+    size: { x: 5.8, y: 2.7, z: 2.6 },
+    rotY: -0.16,
+    color: 0x2c6f7a,
+    material: 'container_teal',
+    label: 'Verteidiger-Reaktorweg Container',
   },
 ];
 

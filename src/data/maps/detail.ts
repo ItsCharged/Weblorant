@@ -372,9 +372,13 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
       continue;
     }
 
-    // --- Lange Mauern: Abdeckung + Leuchten ---
-    if (wallLike && b.size.y >= 4 && minXZ < 3 && maxXZ >= 10 && bottom <= 0.2) {
+    // --- Lange Mauern: Sockelleiste (Plinth), Wandpfeiler (Pilaster), Kabeltrassen & Abdeckung ---
+    if (wallLike && b.size.y >= 3.6 && minXZ < 3.2 && maxXZ >= 8 && bottom <= 0.2) {
       const alongX = b.size.x >= b.size.z;
+      const hw = b.size.x / 2;
+      const hd = b.size.z / 2;
+
+      // 1. Mauerabdeckung oben (Coping / Cap)
       child(
         b,
         'cap',
@@ -385,6 +389,53 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
         style.capMat,
         style.capColor,
       );
+
+      // 2. Durchgehende Sockelleiste am Boden (Continuous Base Plinth / Sockelleiste)
+      const plinthMat: BlockMaterial = theme === 'arctic' ? 'metal' : theme === 'oldtown' ? 'stone_sand' : 'concrete';
+      const plinthColor = darken(b.color, 0.76);
+      for (const side of [1, -1]) {
+        const off = side * (minXZ / 2 + 0.04);
+        if (alongX) {
+          child(b, 'plinth', 0, -b.size.y / 2 + 0.2, off, { x: b.size.x, y: 0.4, z: 0.1 }, plinthMat, plinthColor);
+        } else {
+          child(b, 'plinth', off, -b.size.y / 2 + 0.2, 0, { x: 0.1, y: 0.4, z: b.size.z }, plinthMat, plinthColor);
+        }
+      }
+
+      // 3. Vertikale Wandpfeiler / Pilaster zur rhythmischen Gliederung großer Mauerzüge
+      const pilasterSpan = 6.0;
+      const pilasterCount = Math.max(1, Math.floor((maxXZ - 2) / pilasterSpan));
+      const pilasterMat: BlockMaterial = style.capMat;
+      const pilasterColor = darken(b.color, 0.88);
+      for (let i = 0; i < pilasterCount; i++) {
+        const t = -maxXZ / 2 + ((i + 0.5) * maxXZ) / pilasterCount;
+        for (const side of [1, -1]) {
+          const off = side * (minXZ / 2 + 0.08);
+          if (alongX) {
+            child(b, 'pilaster', t, 0, off, { x: 0.48, y: b.size.y + 0.05, z: 0.18 }, pilasterMat, pilasterColor);
+          } else {
+            child(b, 'pilaster', off, 0, t, { x: 0.18, y: b.size.y + 0.05, z: 0.48 }, pilasterMat, pilasterColor);
+          }
+        }
+      }
+
+      // 4. Industrielle Kabeltrassen / Versorgungsrohre (Conduits & Pipes) entlang der Mauerläufe
+      const pipeMat: BlockMaterial = 'metal';
+      const pipeColor = theme === 'arctic' ? 0x6e8092 : theme === 'oldtown' ? 0x4a3c2c : 0x36404d;
+      const pipeY1 = -b.size.y / 2 + 1.15;
+      const pipeY2 = -b.size.y / 2 + 1.45;
+      for (const side of [1, -1]) {
+        const off = side * (minXZ / 2 + 0.07);
+        if (alongX) {
+          child(b, 'conduit', 0, pipeY1, off, { x: b.size.x - 0.2, y: 0.07, z: 0.07 }, pipeMat, pipeColor);
+          child(b, 'conduit', 0, pipeY2, off, { x: b.size.x - 0.2, y: 0.05, z: 0.05 }, pipeMat, darken(pipeColor, 0.85));
+        } else {
+          child(b, 'conduit', off, pipeY1, 0, { x: 0.07, y: 0.07, z: b.size.z - 0.2 }, pipeMat, pipeColor);
+          child(b, 'conduit', off, pipeY2, 0, { x: 0.05, y: 0.05, z: b.size.z - 0.2 }, pipeMat, darken(pipeColor, 0.85));
+        }
+      }
+
+      // 5. Wandleuchten & Flutlichtstrahler
       const count = Math.max(1, Math.floor(maxXZ / 10));
       const ly = Math.min(b.size.y / 2 - 0.8, 4.2 - b.pos.y);
       for (let i = 0; i < count; i++) {
@@ -394,8 +445,11 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
           const off = side * (minXZ / 2 + 0.1);
           if (alongX) {
             child(b, 'lamp', t, ly, off, { x: 0.7, y: 0.16, z: 0.2 }, lamp.material, lamp.color);
+            // Flutlicht-Befestigungsarm
+            child(b, 'lamp_arm', t, ly - 0.15, off * 0.85, { x: 0.12, y: 0.28, z: 0.14 }, 'metal', 0x222a33);
           } else {
             child(b, 'lamp', off, ly, t, { x: 0.2, y: 0.16, z: 0.7 }, lamp.material, lamp.color);
+            child(b, 'lamp_arm', off * 0.85, ly - 0.15, t, { x: 0.14, y: 0.28, z: 0.12 }, 'metal', 0x222a33);
           }
         }
       }
@@ -441,6 +495,99 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
   }
 
   // =========================================================================
+  // 1b. Taktische Wegweiser & Standort-Schilder (STANDORT A, STANDORT B, MITTE)
+  // =========================================================================
+  if (map.callouts) {
+    for (const callout of map.callouts) {
+      const isSiteA = callout.label.includes('A-');
+      const isSiteB = callout.label.includes('B-');
+      const isMid = callout.label.includes('Mittel') || callout.label.includes('Mitte');
+      if (!isSiteA && !isSiteB && !isMid) continue;
+
+      const signColor = isSiteA ? 0xff6b2b : isSiteB ? 0x18d4c9 : 0xffc47a;
+      const trimMat: BlockMaterial = isSiteA ? 'trim_orange' : isSiteB ? 'trim_teal' : 'metal';
+      const boardMat: BlockMaterial = theme === 'arctic' ? 'arctic_panel' : theme === 'oldtown' ? 'timber_beam' : 'metal';
+
+      // Schildträgerpfosten & Leuchtrahmen an Hallenecken oder Übergängen
+      push(
+        'site_post',
+        { x: callout.pos.x, y: 1.8, z: callout.pos.z },
+        { x: 0.16, y: 3.6, z: 0.16 },
+        'metal',
+        0x36404d,
+      );
+      // Schild-Hauptplatte (Wegweiser / Callout-Schild)
+      push(
+        'site_sign_board',
+        { x: callout.pos.x, y: 3.2, z: callout.pos.z },
+        { x: 2.2, y: 0.8, z: 0.14 },
+        boardMat,
+        0x20262e,
+      );
+      // Akzent-Leuchtstreifen oben & unten
+      push(
+        'site_sign_trim_top',
+        { x: callout.pos.x, y: 3.62, z: callout.pos.z },
+        { x: 2.24, y: 0.08, z: 0.18 },
+        trimMat,
+        signColor,
+      );
+      push(
+        'site_sign_trim_bot',
+        { x: callout.pos.x, y: 2.78, z: callout.pos.z },
+        { x: 2.24, y: 0.08, z: 0.18 },
+        trimMat,
+        signColor,
+      );
+    }
+  }
+
+  // =========================================================================
+  // 1c. Taktische Requisiten & Industrie-Props (Paletten, Radianit-Kanister, Poller, Konsolen, Flutlichtständer)
+  // =========================================================================
+  // Deterministic scatter around key corridors & courtyards (avoiding active zones)
+  const propCount = theme === 'range' ? 12 : 18;
+  const hxProp = map.bounds.width / 2 - 14;
+  const hzProp = map.bounds.depth / 2 - 14;
+  const inZoneCheck = (x: number, z: number, r: number): boolean =>
+    map.zones.some(
+      (zn) =>
+        Math.abs(x - zn.center.x) < zn.size.x / 2 + r + 1.2 &&
+        Math.abs(z - zn.center.z) < zn.size.z / 2 + r + 1.2,
+    );
+
+  for (let k = 0; k < propCount; k++) {
+    const px = (rand() * 2 - 1) * hxProp;
+    const pz = (rand() * 2 - 1) * hzProp;
+    if (Math.abs(px) < 5 || inZoneCheck(px, pz, 2.5)) continue;
+    const typeRoll = rand();
+
+    if (typeRoll < 0.25) {
+      // 1. Holzpaletten-Stapel mit Radianit/Shard-Lagerkanistern
+      push('prop_pallet', { x: px, y: 0.08, z: pz }, { x: 1.4, y: 0.16, z: 1.4 }, 'wood', 0x855c38);
+      push('prop_pallet', { x: px, y: 0.24, z: pz }, { x: 1.4, y: 0.16, z: 1.4 }, 'wood', 0x7c5432, { y: 0.05 });
+      // Shard-Lagerkanister oben auf Palette
+      push('prop_canister_1', { x: px - 0.25, y: 0.62, z: pz - 0.2 }, { x: 0.45, y: 0.6, z: 0.45 }, 'trim_teal', 0x18d4c9);
+      push('prop_canister_2', { x: px + 0.25, y: 0.62, z: pz + 0.2 }, { x: 0.45, y: 0.6, z: 0.45 }, 'container_slate', 0x364350);
+    } else if (typeRoll < 0.5) {
+      // 2. Barriere-Poller / Sicherheits-Bollards (Paar)
+      push('prop_bollard_a', { x: px, y: 0.48, z: pz - 0.7 }, { x: 0.28, y: 0.96, z: 0.28 }, 'metal', 0xd48b28);
+      push('prop_bollard_b', { x: px, y: 0.48, z: pz + 0.7 }, { x: 0.28, y: 0.96, z: 0.28 }, 'metal', 0xd48b28);
+      push('prop_bollard_cap_a', { x: px, y: 0.98, z: pz - 0.7 }, { x: 0.32, y: 0.08, z: 0.32 }, 'trim_orange', 0xff6b2b);
+      push('prop_bollard_cap_b', { x: px, y: 0.98, z: pz + 0.7 }, { x: 0.32, y: 0.08, z: 0.32 }, 'trim_orange', 0xff6b2b);
+    } else if (typeRoll < 0.75) {
+      // 3. Freistehende Steuer-Konsole mit Holo-Display
+      push('prop_console_base', { x: px, y: 0.5, z: pz }, { x: 0.9, y: 1.0, z: 0.65 }, 'metal', 0x2e3742);
+      push('prop_console_screen', { x: px, y: 1.15, z: pz }, { x: 0.75, y: 0.36, z: 0.06 }, 'holo_screen', 0x18d4c9, { x: -0.2 });
+    } else {
+      // 4. Mobiler Flutlicht-Mastständer für Nacht/Industriebereiche
+      push('prop_floodlight_base', { x: px, y: 0.15, z: pz }, { x: 0.8, y: 0.3, z: 0.8 }, 'metal', 0x45515f);
+      push('prop_floodlight_pole', { x: px, y: 1.6, z: pz }, { x: 0.12, y: 2.8, z: 0.12 }, 'metal', 0x2c343d);
+      push('prop_floodlight_head', { x: px, y: 3.05, z: pz }, { x: 0.7, y: 0.32, z: 0.4 }, 'trim_orange', 0xffc47a, { x: 0.25 });
+    }
+  }
+
+  // =========================================================================
   // 2. Boden-Variation (nicht in Zonen, nicht auf der Mittelachse)
   // =========================================================================
   if (theme !== 'range') {
@@ -475,8 +622,8 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
       const puddle = material === 'water_dock' || material === 'ice_glass';
       push(
         'ground',
-        { x, y: 0.015, z },
-        { x: puddle ? sx * 0.6 : sx, y: 0.03, z: puddle ? sz * 0.6 : sz },
+        { x, y: 0.005, z },
+        { x: puddle ? sx * 0.6 : sx, y: 0.01, z: puddle ? sz * 0.6 : sz },
         material,
         color,
         { y: ry },
@@ -647,15 +794,18 @@ export function buildMapDetail(map: MapDefinition): MapDetail {
           push('tower', { x, y: base + h + 0.6, z }, { x: 6.6, y: 1.2, z: 6.6 }, 'terracotta', style.roofColor);
           push('tower', { x, y: base + h + 3.2, z }, { x: 3.2, y: 4.4, z: 3.2 }, 'terracotta', style.roofColor, { y: Math.PI / 4 });
         } else if (roll < 0.9) {
-          // Zypressen-Gruppe
+          // Zypressen-Gruppe mit Holzzaun/Stamm und dichtem Blattwerk
           const trees = 2 + Math.floor(rand() * 3);
           for (let t = 0; t < trees; t++) {
             const h = 14 + rand() * 10;
             const tx = x + (rand() - 0.5) * 9;
             const tz = z + (rand() - 0.5) * 9;
             const green = rand() > 0.5 ? 0x3f6b45 : 0x355c3d;
-            push('tree', { x: tx, y: base + h / 2, z: tz }, { x: 2.2, y: h, z: 2.2 }, 'concrete', green);
-            push('tree', { x: tx, y: base + h / 2 - 0.6, z: tz }, { x: 2.2, y: h - 1.2, z: 2.2 }, 'concrete', green, { y: Math.PI / 4 });
+            // Stamm
+            push('tree_trunk', { x: tx, y: base + 1.6, z: tz }, { x: 0.5, y: 3.2, z: 0.5 }, 'timber_beam', 0x5a3e28);
+            // Baumkrone / Zypresse mit natürlichem Foliage-Material
+            push('tree', { x: tx, y: base + 2.4 + (h - 2.4) / 2, z: tz }, { x: 2.2, y: h - 2.4, z: 2.2 }, 'foliage', green);
+            push('tree', { x: tx, y: base + 2.4 + (h - 2.4) / 2 - 0.4, z: tz }, { x: 2.2, y: h - 3.2, z: 2.2 }, 'foliage', green, { y: Math.PI / 4 });
           }
         } else {
           // Windmühle – Flügel drehen sich zur Karte hin

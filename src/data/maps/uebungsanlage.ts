@@ -292,8 +292,8 @@ const UEBUNGSANLAGE_BLOCKS: MapBlock[] = [
   },
   {
     id: 'range_spray_stand_marker',
-    pos: { x: -16, y: 0.02, z: 12.05 },
-    size: { x: 2.8, y: 0.04, z: 1.6 },
+    pos: { x: -16, y: 0.005, z: 12.05 },
+    size: { x: 2.8, y: 0.01, z: 1.6 },
     color: 0x18d4c9,
     material: 'trim_teal',
     collider: false,
@@ -363,8 +363,8 @@ const UEBUNGSANLAGE_BLOCKS: MapBlock[] = [
     5.8,
     0.0,
     0.32,
-    0xd48b28,
-    'hazard',
+    0x855c38,
+    'timber_beam',
     'Aufgang Rampe 1',
   ),
   {
@@ -483,8 +483,8 @@ const UEBUNGSANLAGE_BLOCKS: MapBlock[] = [
   // Harbor Water Basin & Walkable Timber Pier (North-West section of courtyard)
   {
     id: 'range_pier_water_basin',
-    pos: { x: -39.5, y: 0.03, z: -17.0 },
-    size: { x: 24.0, y: 0.04, z: 16.0 },
+    pos: { x: -39.5, y: 0.005, z: -17.0 },
+    size: { x: 24.0, y: 0.01, z: 16.0 },
     color: 0x2b7285,
     material: 'water_dock',
     collider: false,
@@ -585,6 +585,31 @@ const UEBUNGSANLAGE_BLOCKS: MapBlock[] = [
     color: 0x855c38,
     material: 'timber_beam',
     label: 'Außenhof-Podest',
+  },
+  // Außenhof-Deckung: Hafenkisten-Stapel am Südrand des Piers (außerhalb der Sichtlinien zum Schießstand)
+  {
+    id: 'range_courtyard_tactical_crate_1',
+    pos: { x: -30.0, y: 0.7, z: 12.0 },
+    size: { x: 2.2, y: 1.4, z: 2.2 },
+    color: 0x855c38,
+    material: 'timber_beam',
+    label: 'Außenhof Holzkiste',
+  },
+  {
+    id: 'range_courtyard_tactical_crate_2',
+    pos: { x: -30.0, y: 1.8, z: 12.0 },
+    size: { x: 1.4, y: 0.8, z: 1.4 },
+    color: 0xc9653c,
+    material: 'terracotta',
+    label: 'Außenhof Stapelkiste',
+  },
+  {
+    id: 'range_courtyard_tactical_crate_3',
+    pos: { x: -30.0, y: 0.7, z: -1.0 },
+    size: { x: 2.0, y: 1.4, z: 2.0 },
+    color: 0xcab89b,
+    material: 'stone_sand',
+    label: 'Außenhof Steinquader',
   },
 ];
 

@@ -1,29 +1,37 @@
 import './ui/styles.css';
 import { ref, set } from 'firebase/database';
 import { SynthAudio } from './audio/SynthAudio';
-import { BUY_PHASE_SEC, DEFAULT_SETTINGS, SIM_TICK_RATE, START_CREDITS } from './core/Config';
+import {
+  BUY_PHASE_SEC,
+  DEFAULT_SETTINGS,
+  loadSavedKeybinds,
+  saveKeybinds,
+  SIM_TICK_RATE,
+  START_CREDITS,
+} from './core/Config';
 import { GameLoop } from './core/GameLoop';
 import { InputManager } from './core/InputManager';
-import type {
-  AbilitySlot,
-  BuyItemType,
-  CharacterId,
-  GameSettings,
-  GraphicsQuality,
-  InputSnapshot,
-  KernStatus,
-  LoadoutSlot,
-  MapId,
-  MatchPhase,
-  NetSimConfig,
-  PlayerAbilityState,
-  RoomMatchSummary,
-  RoomStatus,
-  RoundWinReason,
-  TeamId,
-  TransportMode,
-  Vec3,
-  WeaponId,
+import {
+  type AbilitySlot,
+  ALL_MAP_IDS,
+  type BuyItemType,
+  type CharacterId,
+  type GameSettings,
+  type GraphicsQuality,
+  type InputSnapshot,
+  type KernStatus,
+  type LoadoutSlot,
+  type MapId,
+  type MatchPhase,
+  type NetSimConfig,
+  type PlayerAbilityState,
+  type RoomMatchSummary,
+  type RoomStatus,
+  type RoundWinReason,
+  type TeamId,
+  type TransportMode,
+  type Vec3,
+  type WeaponId,
 } from './core/types';
 import { CHARACTER_LIST, DEFAULT_CHARACTER_ID, TEAM_DEFS } from './data/characters';
 import { getMapDefinition } from './data/maps';
@@ -52,7 +60,6 @@ import { BuyMenu } from './ui/BuyMenu';
 import { ChatOverlay } from './ui/ChatOverlay';
 import { DebugOverlay } from './ui/DebugOverlay';
 import {
-  HUD_WEAPON_SLOTS,
   HudOverlay,
   NETSIM_PRESETS,
   type OnlineHudContext,
@@ -202,10 +209,14 @@ async function bootstrap(): Promise<void> {
     ...DEFAULT_SETTINGS,
     graphics: loadGraphicsQuality(),
     crosshair: { ...DEFAULT_SETTINGS.crosshair },
+    keybinds: loadSavedKeybinds(),
   };
 
   let screenMode: ScreenMode = 'landing';
   let selectedOfflineCharacter: CharacterId = DEFAULT_CHARACTER_ID;
+  let offlinePrimaryWeapon: WeaponId = 'lanze';
+  let offlineSecondaryWeapon: WeaponId = 'funke';
+  let offlineActiveSlot: LoadoutSlot = 1;
   let latestRoomSnapshot: RoomSnapshot | null = null;
   let enteredMatchForRoomCode: string | null = null;
   let onlineSession: OnlineSession | null = null;
@@ -260,12 +271,41 @@ async function bootstrap(): Promise<void> {
   });
   let lastTransportMode: TransportMode | null = null;
 
+  const syncOfflineWeaponSlot = (weaponId: WeaponId): void => {
+    if (weaponId === 'funke' || weaponId === 'bolzer') {
+      offlineSecondaryWeapon = weaponId;
+      offlineActiveSlot = 2;
+    } else {
+      offlinePrimaryWeapon = weaponId;
+      offlineActiveSlot = 1;
+    }
+    session.equipWeapon(weaponId);
+  };
+
   // 3. Input Manager (Pointer Lock strictly gated to active gameplay clicks)
   const input = new InputManager(canvas, {
     sensitivity: settings.sensitivity,
+    keybinds: settings.keybinds,
     lockOnCanvasClick: false,
     onDebugToggle: () => {
       debugOverlay.toggle();
+    },
+    onAbilityInfoToggle: () => {
+      if (screenMode !== 'in_game') return;
+      hud.toggleAbilityInfoOverlay();
+      audio.playUiBeep(true);
+    },
+    onSpecialistSelectToggle: () => {
+      if (screenMode !== 'in_game' || latestRoomSnapshot !== null || onlineSession !== null) return;
+      hud.toggleOfflineSpecialistOverlay();
+      audio.playUiBeep(true);
+    },
+    onMapSwitchOffline: () => {
+      if (screenMode !== 'in_game' || latestRoomSnapshot !== null || onlineSession !== null) return;
+      const idx = ALL_MAP_IDS.indexOf(session.activeMapId);
+      const nextMap = ALL_MAP_IDS[(idx + 1) % ALL_MAP_IDS.length];
+      switchOfflineMap(nextMap);
+      audio.playUiBeep(true);
     },
     onWeaponSlot: (slot: number) => {
       if (screenMode !== 'in_game') return;
@@ -279,21 +319,16 @@ async function bootstrap(): Promise<void> {
         return;
       }
 
-      if (hud.isOfflineSpecialistOverlayOpen() && slot >= 1 && slot <= CHARACTER_LIST.length) {
-        const chosen = CHARACTER_LIST[slot - 1].id;
-        selectedOfflineCharacter = chosen;
-        session.setCharacter(chosen);
-        abilityEffectsRenderer.clear();
-        hud.highlightCharacter(chosen);
-        lobbyScreen.setSelectedSoloCharacter(chosen);
-        hud.closeOfflineSpecialistOverlay();
+      if (slot === 1) {
+        offlineActiveSlot = 1;
+        session.equipWeapon(offlinePrimaryWeapon);
         audio.playUiBeep(true);
-        return;
-      }
-
-      const targetWeapon = HUD_WEAPON_SLOTS[slot - 1];
-      if (targetWeapon) {
-        session.equipWeapon(targetWeapon);
+      } else if (slot === 2) {
+        offlineActiveSlot = 2;
+        session.equipWeapon(offlineSecondaryWeapon);
+        audio.playUiBeep(true);
+      } else if (slot === 3) {
+        offlineActiveSlot = 3;
         audio.playUiBeep(true);
       }
     },
@@ -360,7 +395,7 @@ async function bootstrap(): Promise<void> {
         onlineSession.requestBuy(itemType, itemId);
       } else {
         if (itemType === 'weapon') {
-          session.equipWeapon(itemId as WeaponId);
+          syncOfflineWeaponSlot(itemId as WeaponId);
           audio.playBuySuccess();
           buyMenu.showPurchaseFeedback(true, 'Waffe ausgerüstet.');
         } else if (itemType === 'armor') {
@@ -1708,9 +1743,9 @@ async function bootstrap(): Promise<void> {
         visualRecoilPitchRad: visRecoil.pitchRad,
         visualRecoilYawRad: visRecoil.yawRad,
         weaponId: session.weapon.weaponId,
-        viewItem: 'weapon',
-        isAds: session.isAdsActive,
-        isReloading: session.weapon.isReloading,
+        viewItem: offlineActiveSlot === 3 ? 'knife' : 'weapon',
+        isAds: offlineActiveSlot !== 3 && session.isAdsActive,
+        isReloading: offlineActiveSlot !== 3 && session.weapon.isReloading,
         reloadProgress: session.weapon.reloadProgress,
         horizontalSpeed: session.motor.horizontalSpeed,
         stance: session.stance,
@@ -1766,7 +1801,7 @@ async function bootstrap(): Promise<void> {
       shotEffects.update(frameDt);
 
       mapBuilder.update(frameDt);
-        renderer.render(fpCamera.camera, frameDt);
+      renderer.render(fpCamera.camera, frameDt);
 
       // Offline minimap (training targets) + Tab training overview
       const offlineDummies = session.getDummies();
@@ -1801,8 +1836,8 @@ async function bootstrap(): Promise<void> {
           team: 'A',
           character: selfDef.id,
           alive: true,
-          weaponLabel: session.getWeaponStats().name,
-          weaponSvgId: session.weapon.weaponId,
+          weaponLabel: offlineActiveSlot === 3 ? 'Taktik-Klinge' : session.getWeaponStats().name,
+          weaponSvgId: offlineActiveSlot === 3 ? 'knife' : session.weapon.weaponId,
           armor: session.playerShield,
           armorMax: 50,
           ultPoints: offlineAbilities.ultPoints,
@@ -1853,10 +1888,9 @@ async function bootstrap(): Promise<void> {
             team: 'A',
             character: session.characterId,
             credits: 9000,
-            primaryWeapon: session.weapon.weaponId,
-            secondaryWeapon:
-              session.weapon.weaponId === 'bolzer' ? 'bolzer' : ('funke' as WeaponId),
-            activeSlot: 1 as LoadoutSlot,
+            primaryWeapon: offlinePrimaryWeapon,
+            secondaryWeapon: offlineSecondaryWeapon,
+            activeSlot: offlineActiveSlot,
             armor: session.playerShield,
             armorMax: 50,
             hasKern: false,
@@ -1892,8 +1926,8 @@ async function bootstrap(): Promise<void> {
           isReloading: session.weapon.isReloading,
           reloadProgress: session.weapon.reloadProgress,
           spreadDeg: session.currentSpreadDeg,
-          isScopedFalke: fpCamera.isScopedFalke(),
-          scopeView: fpCamera.getScopeView(),
+          isScopedFalke: offlineActiveSlot !== 3 && fpCamera.isScopedFalke(),
+          scopeView: offlineActiveSlot !== 3 ? fpCamera.getScopeView() : undefined,
           pointerLocked: input.isPointerLocked() || buyMenu.isOpen(),
           challengeActive: challenge.active,
           challengeHits: challenge.hits,
@@ -1912,6 +1946,11 @@ async function bootstrap(): Promise<void> {
           aliveTargetsOffline: session.getAliveDummyCount(),
           totalTargetsOffline: session.getDummies().length,
           offlineTotalKills: session.totalKills,
+          offlineLoadout: {
+            primaryWeapon: offlinePrimaryWeapon,
+            secondaryWeapon: offlineSecondaryWeapon,
+            activeSlot: offlineActiveSlot,
+          },
           onlineContext: null,
         },
         frameDt

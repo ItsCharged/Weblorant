@@ -126,7 +126,10 @@ export class LobbyScreen {
   private readonly modeCardSubEl: HTMLElement;
   private readonly modeCardMapBadgeEl: HTMLElement;
 
-  // Play tab: Solo vs Room blocks & preserved controls
+  // Play tab: Sub-menu navigation & preserved controls
+  private playActiveSubView: 'match' | 'room' | 'training' = 'match';
+  private readonly playSubNavBtns = new Map<'match' | 'room' | 'training', HTMLButtonElement>();
+  private readonly playSubViews = new Map<'match' | 'room' | 'training', HTMLElement>();
   private readonly soloJoinBlockEl: HTMLElement;
   private readonly roomActiveBlockEl: HTMLElement;
   private readonly inputPlayerName: HTMLInputElement;
@@ -311,140 +314,209 @@ export class LobbyScreen {
             >
               <div class="client-panel-inner is-play-layout">
                 <aside class="play-left-column" aria-label="Modus, Rufzeichen und Raumsteuerung">
-                  <button
-                    type="button"
-                    id="btn-open-mode-drawer"
-                    class="play-mode-card"
-                    aria-haspopup="dialog"
-                    aria-controls="lobby-mode-drawer"
-                  >
-                    <div class="play-mode-card-top">
-                      <span class="play-mode-kicker">EINSATZ-MODUS</span>
-                      <span class="play-mode-map-tag" id="play-mode-map-badge">HAFENWERK</span>
-                    </div>
-                    <div class="play-mode-title" id="play-mode-card-title">KERNBRUCH · ONLINE</div>
-                    <div class="play-mode-sub" id="play-mode-card-sub">3v3 · 7 Sieg-Runden · Modus &amp; Karte wählen ▸</div>
-                  </button>
-
-                  <div class="play-side-card">
-                    <div class="lobby-field">
-                      <div class="lobby-label-row">
-                        <label for="input-player-name">Rufzeichen</label>
-                        <span id="player-name-hint" class="lobby-field-hint">1–16 Zeichen</span>
-                      </div>
-                      <input
-                        type="text"
-                        id="input-player-name"
-                        class="lobby-text-input"
-                        maxlength="16"
-                        minlength="1"
-                        required
-                        autocomplete="nickname"
-                        spellcheck="false"
-                        aria-invalid="false"
-                        aria-describedby="player-name-hint"
-                        data-error="player-name-error"
-                        placeholder="Agent"
-                      />
-                      <div id="player-name-error" class="lobby-field-error">
-                        Bitte Rufzeichen mit 1–16 Zeichen eingeben.
-                      </div>
-                    </div>
-
-                    <button type="button" id="btn-quick-range" class="play-warmup-btn">
-                      <span>ÜBUNGSANLAGE BETRETEN</span>
-                      <span class="play-warmup-sub">Sofort-Training · Schießstand</span>
+                  <!-- Taktische Einsatz-Zentrale Header & Sub-Navigation -->
+                  <div class="play-subnav-bar" role="tablist" aria-label="Einsatz-Bereiche">
+                    <button
+                      type="button"
+                      role="tab"
+                      id="play-subtab-match"
+                      class="play-subnav-btn is-active"
+                      aria-selected="true"
+                      aria-controls="play-subview-match"
+                      data-play-subview="match"
+                    >
+                      <span class="subnav-kicker">// 01</span>
+                      <span class="subnav-title">MATCH</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      id="play-subtab-room"
+                      class="play-subnav-btn"
+                      aria-selected="false"
+                      aria-controls="play-subview-room"
+                      data-play-subview="room"
+                    >
+                      <span class="subnav-kicker">// 02</span>
+                      <span class="subnav-title">TRUPP &amp; RAUM</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      id="play-subtab-training"
+                      class="play-subnav-btn"
+                      aria-selected="false"
+                      aria-controls="play-subview-training"
+                      data-play-subview="training"
+                    >
+                      <span class="subnav-kicker">// 03</span>
+                      <span class="subnav-title">TRAINING</span>
                     </button>
                   </div>
 
-                  <!-- SOLO RAUMCODE BEITRITT -->
-                  <div class="play-side-card" id="lobby-solo-join-block">
-                    <form id="form-join-room" class="lobby-join-form" novalidate>
+                  <!-- SUB-VIEW 1: MATCH & SCHNELLSTART -->
+                  <div class="play-subview-panel" id="play-subview-match" role="tabpanel" aria-labelledby="play-subtab-match">
+                    <div class="tactical-section-head">
+                      <span class="tactical-section-kicker">// 01 EINSATZZENTRALE</span>
+                      <h3 class="tactical-section-title">MODUS &amp; SCHNELLSTART</h3>
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btn-open-mode-drawer"
+                      class="play-mode-card"
+                      aria-haspopup="dialog"
+                      aria-controls="lobby-mode-drawer"
+                    >
+                      <div class="play-mode-card-top">
+                        <span class="play-mode-kicker">EINSATZ-MODUS</span>
+                        <span class="play-mode-map-tag" id="play-mode-map-badge">HAFENWERK</span>
+                      </div>
+                      <div class="play-mode-title" id="play-mode-card-title">KERNBRUCH · ONLINE</div>
+                      <div class="play-mode-sub" id="play-mode-card-sub">3v3 · 7 Sieg-Runden · Modus &amp; Karte wählen ▸</div>
+                    </button>
+
+                    <div class="play-side-card">
                       <div class="lobby-field">
                         <div class="lobby-label-row">
-                          <label for="input-room-code">Raumcode beitreten</label>
-                          <span id="room-code-hint" class="lobby-field-hint">5 Zeichen</span>
+                          <label for="input-player-name">Rufzeichen</label>
+                          <span id="player-name-hint" class="lobby-field-hint">1–16 Zeichen</span>
                         </div>
-                        <div class="lobby-join-row">
-                          <input
-                            type="text"
-                            id="input-room-code"
-                            class="lobby-text-input is-code"
-                            maxlength="5"
-                            minlength="5"
-                            pattern="[A-HJ-NP-Z2-9]{5}"
-                            autocomplete="off"
-                            spellcheck="false"
-                            aria-invalid="false"
-                            aria-describedby="room-code-hint"
-                            data-error="room-code-error"
-                            placeholder="K7M4P"
-                          />
-                          <button type="submit" id="btn-join-room" class="lobby-cta-btn is-cyan is-compact">
-                            BEITRETEN
+                        <input
+                          type="text"
+                          id="input-player-name"
+                          class="lobby-text-input"
+                          maxlength="16"
+                          minlength="1"
+                          required
+                          autocomplete="nickname"
+                          spellcheck="false"
+                          aria-invalid="false"
+                          aria-describedby="player-name-hint"
+                          data-error="player-name-error"
+                          placeholder="Agent"
+                        />
+                        <div id="player-name-error" class="lobby-field-error">
+                          Bitte Rufzeichen mit 1–16 Zeichen eingeben.
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- SPEZIALISTEN SCHNELLWAHL -->
+                    <div class="play-side-card" aria-label="Spezialisten-Schnellwahl">
+                      <div class="play-side-heading">AKTIVER SPEZIALIST</div>
+                      <div class="play-char-chip-grid">
+                        ${quickCharButtonsHtml}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- SUB-VIEW 2: TRUPP & RAUM -->
+                  <div class="play-subview-panel" id="play-subview-room" role="tabpanel" aria-labelledby="play-subtab-room" hidden>
+                    <div class="tactical-section-head">
+                      <span class="tactical-section-kicker">// 02 TRUPP &amp; RAUM</span>
+                      <h3 class="tactical-section-title">LOBBY &amp; RAUMVERWALTUNG</h3>
+                    </div>
+
+                    <!-- SOLO RAUMCODE BEITRITT -->
+                    <div class="play-side-card" id="lobby-solo-join-block">
+                      <form id="form-join-room" class="lobby-join-form" novalidate>
+                        <div class="lobby-field">
+                          <div class="lobby-label-row">
+                            <label for="input-room-code">Raumcode beitreten</label>
+                            <span id="room-code-hint" class="lobby-field-hint">5 Zeichen</span>
+                          </div>
+                          <div class="lobby-join-row">
+                            <input
+                              type="text"
+                              id="input-room-code"
+                              class="lobby-text-input is-code"
+                              maxlength="5"
+                              minlength="5"
+                              pattern="[A-HJ-NP-Z2-9]{5}"
+                              autocomplete="off"
+                              spellcheck="false"
+                              aria-invalid="false"
+                              aria-describedby="room-code-hint"
+                              data-error="room-code-error"
+                              placeholder="K7M4P"
+                            />
+                            <button type="submit" id="btn-join-room" class="lobby-cta-btn is-cyan is-compact">
+                              BEITRETEN
+                            </button>
+                          </div>
+                          <div id="room-code-error" class="lobby-field-error">
+                            5-stelliger Code (ohne O, I, 0, 1).
+                          </div>
+                        </div>
+                      </form>
+                      <div class="lobby-inline-error" id="lobby-error" role="alert" hidden></div>
+                    </div>
+
+                    <!-- AKTIVER ONLINE-RAUM BLOCK -->
+                    <div class="play-side-card is-room-active" id="lobby-room-active-block" hidden>
+                      <div class="room-code-strip">
+                        <div>
+                          <span class="room-code-caption">RAUMCODE</span>
+                          <code class="room-code-value" id="lobby-room-code">-----</code>
+                        </div>
+                        <span class="copy-wrap">
+                          <button
+                            type="button"
+                            id="btn-copy-code"
+                            class="room-copy-btn"
+                            command="--copy"
+                            commandfor="lobby-room-code"
+                          >
+                            KOPIEREN
                           </button>
+                          <span class="copy-tip" id="copy-code-tip" role="status"></span>
+                        </span>
+                      </div>
+
+                      <div class="room-teams-compact">
+                        <div class="room-team-mini is-a">
+                          <div class="room-team-mini-head">
+                            <span class="team-badge is-a">ANGREIFER</span>
+                            <span class="team-count" id="team-a-count">0 / 3</span>
+                            <button type="button" id="btn-team-a" class="team-switch-btn is-a">BEITRETEN</button>
+                          </div>
+                          <div class="team-slots-list is-compact" id="team-a-slots"></div>
                         </div>
-                        <div id="room-code-error" class="lobby-field-error">
-                          5-stelliger Code (ohne O, I, 0, 1).
+
+                        <div class="room-team-mini is-d">
+                          <div class="room-team-mini-head">
+                            <span class="team-badge is-d">VERTEIDIGER</span>
+                            <span class="team-count" id="team-d-count">0 / 3</span>
+                            <button type="button" id="btn-team-d" class="team-switch-btn is-d">BEITRETEN</button>
+                          </div>
+                          <div class="team-slots-list is-compact" id="team-d-slots"></div>
                         </div>
                       </div>
-                    </form>
-                    <div class="lobby-inline-error" id="lobby-error" role="alert" hidden></div>
+
+                      <div class="lobby-inline-error" id="lobby-room-error" role="alert" hidden></div>
+
+                      <button type="button" id="btn-leave-room" class="room-leave-btn is-full">
+                        GRUPPE VERLASSEN
+                      </button>
+                    </div>
                   </div>
 
-                  <!-- AKTIVER ONLINE-RAUM BLOCK -->
-                  <div class="play-side-card is-room-active" id="lobby-room-active-block" hidden>
-                    <div class="room-code-strip">
-                      <div>
-                        <span class="room-code-caption">RAUMCODE</span>
-                        <code class="room-code-value" id="lobby-room-code">-----</code>
-                      </div>
-                      <span class="copy-wrap">
-                        <button
-                          type="button"
-                          id="btn-copy-code"
-                          class="room-copy-btn"
-                          command="--copy"
-                          commandfor="lobby-room-code"
-                        >
-                          KOPIEREN
-                        </button>
-                        <span class="copy-tip" id="copy-code-tip" role="status"></span>
-                      </span>
+                  <!-- SUB-VIEW 3: TAKTIK & TRAINING -->
+                  <div class="play-subview-panel" id="play-subview-training" role="tabpanel" aria-labelledby="play-subtab-training" hidden>
+                    <div class="tactical-section-head">
+                      <span class="tactical-section-kicker">// 03 TAKTIK-TRAINING</span>
+                      <h3 class="tactical-section-title">ÜBUNGSANLAGE &amp; DRILLS</h3>
                     </div>
 
-                    <div class="room-teams-compact">
-                      <div class="room-team-mini is-a">
-                        <div class="room-team-mini-head">
-                          <span class="team-badge is-a">ANGREIFER</span>
-                          <span class="team-count" id="team-a-count">0 / 3</span>
-                          <button type="button" id="btn-team-a" class="team-switch-btn is-a">BEITRETEN</button>
-                        </div>
-                        <div class="team-slots-list is-compact" id="team-a-slots"></div>
+                    <div class="play-side-card">
+                      <button type="button" id="btn-quick-range" class="play-warmup-btn is-featured">
+                        <span class="play-warmup-title">ÜBUNGSANLAGE BETRETEN</span>
+                        <span class="play-warmup-sub">Schießstand · Spray-Wall · Bot-Drills</span>
+                      </button>
+                      <div class="play-training-info">
+                        Trainiere Waffenhandhabung, Rückstoßkontrolle auf 10m/20m/30m Distanzen und teste alle Spezialisten-Fähigkeiten ohne Druck.
                       </div>
-
-                      <div class="room-team-mini is-d">
-                        <div class="room-team-mini-head">
-                          <span class="team-badge is-d">VERTEIDIGER</span>
-                          <span class="team-count" id="team-d-count">0 / 3</span>
-                          <button type="button" id="btn-team-d" class="team-switch-btn is-d">BEITRETEN</button>
-                        </div>
-                        <div class="team-slots-list is-compact" id="team-d-slots"></div>
-                      </div>
-                    </div>
-
-                    <div class="lobby-inline-error" id="lobby-room-error" role="alert" hidden></div>
-
-                    <button type="button" id="btn-leave-room" class="room-leave-btn is-full">
-                      GRUPPE VERLASSEN
-                    </button>
-                  </div>
-
-                  <!-- SPEZIALISTEN SCHNELLWAHL -->
-                  <div class="play-side-card" aria-label="Spezialisten-Schnellwahl">
-                    <div class="play-side-heading">AKTIVER SPEZIALIST</div>
-                    <div class="play-char-chip-grid">
-                      ${quickCharButtonsHtml}
                     </div>
                   </div>
                 </aside>
@@ -631,6 +703,11 @@ export class LobbyScreen {
     this.modeCardSubEl = q('#play-mode-card-sub');
     this.modeCardMapBadgeEl = q('#play-mode-map-badge');
 
+    for (const subId of ['match', 'room', 'training'] as const) {
+      this.playSubNavBtns.set(subId, q(`#play-subtab-${subId}`));
+      this.playSubViews.set(subId, q(`#play-subview-${subId}`));
+    }
+
     this.soloJoinBlockEl = q('#lobby-solo-join-block');
     this.roomActiveBlockEl = q('#lobby-room-active-block');
     this.inputPlayerName = q('#input-player-name');
@@ -714,6 +791,13 @@ export class LobbyScreen {
         else if (e.key === 'Home') nextIdx = 0;
         else if (e.key === 'End') nextIdx = orderedBtns.length - 1;
         this.activateTab(CLIENT_TABS[nextIdx].id, true);
+      });
+    }
+
+    // Play Subnav tabs (Match, Trupp & Raum, Training)
+    for (const [subId, btn] of this.playSubNavBtns.entries()) {
+      btn.addEventListener('click', () => {
+        this.activatePlaySubView(subId);
       });
     }
 
@@ -932,6 +1016,18 @@ export class LobbyScreen {
       this.renderHistoryPanel();
     } else if (nextTab === 'arsenal') {
       this.renderArsenalPanel();
+    }
+  }
+
+  public activatePlaySubView(subId: 'match' | 'room' | 'training'): void {
+    this.playActiveSubView = subId;
+    for (const [id, btn] of this.playSubNavBtns.entries()) {
+      const active = id === subId;
+      btn.setAttribute('aria-selected', active ? 'true' : 'false');
+      btn.classList.toggle('is-active', active);
+    }
+    for (const [id, panel] of this.playSubViews.entries()) {
+      panel.hidden = id !== subId;
     }
   }
 
@@ -2152,6 +2248,7 @@ export class LobbyScreen {
       this.visible = true;
       this.root.hidden = false;
       this.activateTab('play', false);
+      this.activatePlaySubView('room');
       this.soloJoinBlockEl.hidden = true;
       this.roomActiveBlockEl.hidden = false;
       this.btnCreateRoom.hidden = true;
