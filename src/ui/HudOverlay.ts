@@ -14,6 +14,7 @@ import type {
   KeybindMap,
   LoadoutSlot,
   MapId,
+  MobileControlsMode,
   NetSimConfig,
   PlayerAbilityState,
   PlayerStance,
@@ -132,6 +133,7 @@ export interface HudCallbacks {
   onSettingsChange: (settings: GameSettings) => void;
   onReturnToLobby: () => void;
   onNetSimChange: (config: NetSimConfig) => void;
+  onOpenMobileLayoutEditor?: () => void;
 }
 
 export interface HudFrameState {
@@ -759,6 +761,18 @@ export class HudOverlay {
               </div>
               <input type="range" id="slider-vol" class="shard-slider" min="0" max="100" step="1" value="${Math.round(this.settings.volume * 100)}" />
             </div>
+
+            <div class="mobile-settings-panel">
+              <h2 class="dialog-section-label">Mobile Touch-Steuerung</h2>
+              <div class="mobile-mode-selector" id="mobile-mode-selector" role="radiogroup" aria-label="Mobile Touch-Steuerung">
+                <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="auto">Auto</button>
+                <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="on">Immer Ein</button>
+                <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="off">Aus</button>
+              </div>
+              <button type="button" id="btn-open-mobile-editor" class="mobile-editor-open-btn">
+                MOBILE-LAYOUT EDITOR ÖFFNEN
+              </button>
+            </div>
           </div>
 
           <div class="settings-box">
@@ -1190,6 +1204,34 @@ export class HudOverlay {
       this.settings.crosshair.dynamicSpread = chkDynamic.checked;
       this.updateCrosshairGeometry(0);
       this.callbacks.onSettingsChange(this.cloneSettings());
+    });
+
+    const mobileModeBtns = this.dialog.querySelectorAll<HTMLButtonElement>('[data-mobile-mode]');
+    const syncMobileModeButtons = (): void => {
+      mobileModeBtns.forEach((b) => {
+        const active = b.dataset.mobileMode === this.settings.mobileControls;
+        b.classList.toggle('is-active', active);
+        b.setAttribute('aria-checked', active ? 'true' : 'false');
+      });
+    };
+    mobileModeBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mobileMode as MobileControlsMode | undefined;
+        if (mode !== 'auto' && mode !== 'on' && mode !== 'off') return;
+        if (mode === this.settings.mobileControls) return;
+        this.settings.mobileControls = mode;
+        syncMobileModeButtons();
+        this.callbacks.onSettingsChange(this.cloneSettings());
+      });
+    });
+    syncMobileModeButtons();
+
+    const openMobileEditorBtn = this.dialog.querySelector(
+      '#btn-open-mobile-editor'
+    ) as HTMLButtonElement;
+    openMobileEditorBtn.addEventListener('click', () => {
+      this.closeMenu();
+      this.callbacks.onOpenMobileLayoutEditor?.();
     });
   }
 

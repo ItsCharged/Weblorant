@@ -2,7 +2,10 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
     <title>SHARDLINE</title>
     <style>
       *, *::before, *::after {
@@ -13,7 +16,9 @@
         padding: 0;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         overflow: hidden;
+        overscroll-behavior: none;
         background: #0d131a;
         color: #e8eef5;
         user-select: none;
@@ -22,12 +27,14 @@
         position: relative;
         width: 100%;
         height: 100%;
+        height: 100dvh;
         overflow: hidden;
       }
       #game-canvas {
         display: block;
         width: 100%;
         height: 100%;
+        touch-action: none;
       }
       #ui-root {
         position: absolute;

@@ -106,6 +106,34 @@ export type KeybindAction =
 
 export type KeybindMap = Record<KeybindAction, string>;
 
+export type MobileControlsMode = 'auto' | 'on' | 'off';
+
+export type MobileControlId =
+  | 'joystick'
+  | 'fire'
+  | 'ads'
+  | 'jump'
+  | 'crouch'
+  | 'reload'
+  | 'abilityQ'
+  | 'abilityE'
+  | 'abilityUlt'
+  | 'slot1'
+  | 'slot2'
+  | 'slot3'
+  | 'kern'
+  | 'shop'
+  | 'pause';
+
+export interface MobileControlPosition {
+  xPct: number;
+  yPct: number;
+  scale: number;
+  opacity: number;
+}
+
+export type MobileLayoutConfig = Record<MobileControlId, MobileControlPosition>;
+
 export interface GameSettings {
   graphics: GraphicsQuality;
   sensitivity: number;
@@ -113,6 +141,7 @@ export interface GameSettings {
   volume: number;
   crosshair: CrosshairSettings;
   keybinds: KeybindMap;
+  mobileControls: MobileControlsMode;
 }
 
 export type TeamId = 'A' | 'D';

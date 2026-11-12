@@ -1,4 +1,10 @@
-import { DEFAULT_KEYBINDS, DEFAULT_SETTINGS, MOUSE_RAD_PER_COUNT, PITCH_LIMIT } from './Config';
+import {
+  DEFAULT_KEYBINDS,
+  DEFAULT_SETTINGS,
+  isTouchDevice,
+  MOUSE_RAD_PER_COUNT,
+  PITCH_LIMIT,
+} from './Config';
 import { clamp } from './math';
 import type { AbilitySlot, InputSnapshot, KeybindMap, LoadoutSlot } from './types';
 
@@ -43,6 +49,16 @@ export class InputManager {
   private spectatorMode: boolean | null = null;
   private scoreboardHeld = false;
   private kernInteractAvailable = false;
+
+  private touchMode = false;
+  private touchMoveX = 0;
+  private touchMoveZ = 0;
+  private touchFireHeld = false;
+  private touchAdsHeld = false;
+  private touchJumpHeld = false;
+  private touchCrouchHeld = false;
+  private touchReloadHeld = false;
+  private touchKernHeld = false;
 
   public onDebugToggle?: () => void;
   public onShopToggle?: () => void;
@@ -90,8 +106,95 @@ export class InputManager {
     return document.pointerLockElement === this.canvas;
   }
 
+  setTouchMode(active: boolean): void {
+    this.touchMode = active;
+    if (!active) {
+      this.resetTouchInputs();
+    }
+  }
+
+  isTouchMode(): boolean {
+    return this.touchMode;
+  }
+
+  setTouchMove(x: number, z: number): void {
+    this.touchMoveX = Number.isFinite(x) ? clamp(x, -1, 1) : 0;
+    this.touchMoveZ = Number.isFinite(z) ? clamp(z, -1, 1) : 0;
+  }
+
+  addTouchLookDelta(dx: number, dy: number): void {
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    const scale = this.sensitivity * MOUSE_RAD_PER_COUNT * 1.45;
+    this.yaw -= dx * scale;
+    this.pitch = clamp(this.pitch - dy * scale, -PITCH_LIMIT, PITCH_LIMIT);
+  }
+
+  setTouchAction(
+    action: 'fire' | 'ads' | 'jump' | 'crouch' | 'reload' | 'kernInteract',
+    active: boolean
+  ): void {
+    if (this.spectatorMode === true && action === 'fire' && active) {
+      this.onSpectatorCycle?.(1);
+      return;
+    }
+    switch (action) {
+      case 'fire':
+        this.touchFireHeld = active;
+        if (active) this.fireLatched = true;
+        break;
+      case 'ads':
+        this.touchAdsHeld = active;
+        break;
+      case 'jump':
+        this.touchJumpHeld = active;
+        if (active) this.jumpLatched = true;
+        break;
+      case 'crouch':
+        this.touchCrouchHeld = active;
+        break;
+      case 'reload':
+        this.touchReloadHeld = active;
+        if (active) this.reloadLatched = true;
+        break;
+      case 'kernInteract':
+        this.touchKernHeld = active;
+        break;
+    }
+  }
+
+  triggerTouchKeyAction(
+    action: 'abilityQ' | 'abilityE' | 'abilityUlt' | 'slot1' | 'slot2' | 'slot3' | 'buyMenu'
+  ): void {
+    switch (action) {
+      case 'abilityQ':
+        this.onAbilityKey?.('q');
+        break;
+      case 'abilityE':
+        this.onAbilityKey?.('e');
+        break;
+      case 'abilityUlt':
+        this.onAbilityKey?.('x');
+        break;
+      case 'slot1':
+        this.equipSlotLatched = 1;
+        this.onWeaponSlot?.(1, this.keybinds.slot1);
+        break;
+      case 'slot2':
+        this.equipSlotLatched = 2;
+        this.onWeaponSlot?.(2, this.keybinds.slot2);
+        break;
+      case 'slot3':
+        this.equipSlotLatched = 3;
+        this.onWeaponSlot?.(3, this.keybinds.slot3);
+        break;
+      case 'buyMenu':
+        this.onShopToggle?.();
+        break;
+    }
+  }
+
   requestLock(): void {
-    if (this.isPointerLocked()) return;
+    if (this.touchMode || isTouchDevice() || this.isPointerLocked()) return;
     try {
       const maybePromise = (
         this.canvas.requestPointerLock as unknown as (options?: {
@@ -177,7 +280,7 @@ export class InputManager {
   sampleInput(dt: number): InputSnapshot {
     this.seq += 1;
 
-    if (!this.isPointerLocked()) {
+    if (!this.isPointerLocked() && !this.touchMode) {
       this.jumpLatched = false;
       this.fireLatched = false;
       this.reloadLatched = false;
@@ -201,19 +304,22 @@ export class InputManager {
     }
 
     const kb = this.keybinds;
-    const moveForward =
+    const kbForward =
       (this.heldKeys.has(kb.moveForward) ? 1 : 0) - (this.heldKeys.has(kb.moveBack) ? 1 : 0);
-    const moveRight =
+    const kbRight =
       (this.heldKeys.has(kb.moveRight) ? 1 : 0) - (this.heldKeys.has(kb.moveLeft) ? 1 : 0);
 
-    const crouch = this.heldKeys.has(kb.crouch);
+    const moveForward = clamp(kbForward + this.touchMoveZ, -1, 1);
+    const moveRight = clamp(kbRight + this.touchMoveX, -1, 1);
+
+    const crouch = this.heldKeys.has(kb.crouch) || this.touchCrouchHeld;
     const walk = this.heldKeys.has(kb.walk);
 
-    const jump = this.heldKeys.has(kb.jump) || this.jumpLatched;
-    const fire = this.mouseLeftHeld || this.fireLatched;
-    const reload = this.heldKeys.has(kb.reload) || this.reloadLatched;
-    const ads = this.mouseRightHeld;
-    const holdKern = this.heldKeys.has(kb.kernInteract);
+    const jump = this.heldKeys.has(kb.jump) || this.touchJumpHeld || this.jumpLatched;
+    const fire = this.mouseLeftHeld || this.touchFireHeld || this.fireLatched;
+    const reload = this.heldKeys.has(kb.reload) || this.touchReloadHeld || this.reloadLatched;
+    const ads = this.mouseRightHeld || this.touchAdsHeld;
+    const holdKern = this.heldKeys.has(kb.kernInteract) || this.touchKernHeld;
     const equipSlot = this.equipSlotLatched;
 
     this.jumpLatched = false;
@@ -253,6 +359,17 @@ export class InputManager {
     this.resetHeldInputs();
   }
 
+  private resetTouchInputs(): void {
+    this.touchMoveX = 0;
+    this.touchMoveZ = 0;
+    this.touchFireHeld = false;
+    this.touchAdsHeld = false;
+    this.touchJumpHeld = false;
+    this.touchCrouchHeld = false;
+    this.touchReloadHeld = false;
+    this.touchKernHeld = false;
+  }
+
   private resetHeldInputs(): void {
     this.heldKeys.clear();
     this.mouseLeftHeld = false;
@@ -261,6 +378,7 @@ export class InputManager {
     this.fireLatched = false;
     this.reloadLatched = false;
     this.equipSlotLatched = undefined;
+    this.resetTouchInputs();
     if (this.scoreboardHeld) {
       this.scoreboardHeld = false;
       this.onScoreboardToggle?.(false);
@@ -369,7 +487,9 @@ export class InputManager {
         this.onMapSwitchOffline?.();
       }
       if (e.code === kb.buyMenu) {
+        e.preventDefault();
         this.onShopToggle?.();
+        return;
       }
     }
 

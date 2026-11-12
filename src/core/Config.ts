@@ -1,5 +1,21 @@
-import type { GameSettings, KeybindAction, KeybindMap } from './types';
-export type { GameSettings, KeybindAction, KeybindMap };
+import type {
+  GameSettings,
+  KeybindAction,
+  KeybindMap,
+  MobileControlId,
+  MobileControlPosition,
+  MobileControlsMode,
+  MobileLayoutConfig,
+} from './types';
+export type {
+  GameSettings,
+  KeybindAction,
+  KeybindMap,
+  MobileControlId,
+  MobileControlPosition,
+  MobileControlsMode,
+  MobileLayoutConfig,
+};
 
 export const SIM_TICK_RATE = 30;
 export const SIM_DT = 1 / 30;
@@ -245,6 +261,155 @@ export function saveKeybinds(keybinds: KeybindMap): void {
   }
 }
 
+export const MOBILE_CONTROLS_STORAGE_KEY = 'shardline.mobileControls';
+export const MOBILE_LAYOUT_STORAGE_KEY = 'shardline.mobileLayout';
+
+export const MOBILE_CONTROL_IDS: readonly MobileControlId[] = [
+  'joystick',
+  'fire',
+  'ads',
+  'jump',
+  'crouch',
+  'reload',
+  'abilityQ',
+  'abilityE',
+  'abilityUlt',
+  'slot1',
+  'slot2',
+  'slot3',
+  'kern',
+  'shop',
+  'pause',
+] as const;
+
+export const DEFAULT_MOBILE_LAYOUT: MobileLayoutConfig = {
+  joystick: { xPct: 14, yPct: 72, scale: 1.0, opacity: 0.8 },
+  fire: { xPct: 86, yPct: 68, scale: 1.15, opacity: 0.85 },
+  ads: { xPct: 75, yPct: 56, scale: 0.95, opacity: 0.8 },
+  jump: { xPct: 91, yPct: 48, scale: 0.95, opacity: 0.8 },
+  crouch: { xPct: 76, yPct: 78, scale: 0.9, opacity: 0.8 },
+  reload: { xPct: 88, yPct: 85, scale: 0.9, opacity: 0.8 },
+  abilityQ: { xPct: 67, yPct: 84, scale: 0.85, opacity: 0.8 },
+  abilityE: { xPct: 59, yPct: 84, scale: 0.85, opacity: 0.8 },
+  abilityUlt: { xPct: 51, yPct: 84, scale: 0.85, opacity: 0.8 },
+  slot1: { xPct: 33, yPct: 90, scale: 0.8, opacity: 0.78 },
+  slot2: { xPct: 40, yPct: 90, scale: 0.8, opacity: 0.78 },
+  slot3: { xPct: 47, yPct: 90, scale: 0.8, opacity: 0.78 },
+  kern: { xPct: 82, yPct: 36, scale: 0.95, opacity: 0.85 },
+  shop: { xPct: 24, yPct: 16, scale: 0.85, opacity: 0.85 },
+  pause: { xPct: 94, yPct: 8, scale: 0.85, opacity: 0.85 },
+};
+
+const FALLBACK_CONTROL_POS: MobileControlPosition = {
+  xPct: 50,
+  yPct: 50,
+  scale: 1.0,
+  opacity: 0.8,
+};
+
+function clampFinite(value: unknown, min: number, max: number, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
+export function clampMobileControlPosition(
+  pos: Partial<MobileControlPosition> | null | undefined,
+  fallback: MobileControlPosition = FALLBACK_CONTROL_POS
+): MobileControlPosition {
+  if (!pos || typeof pos !== 'object') {
+    return { ...fallback };
+  }
+  return {
+    xPct: clampFinite(pos.xPct, 4, 96, fallback.xPct),
+    yPct: clampFinite(pos.yPct, 6, 94, fallback.yPct),
+    scale: clampFinite(pos.scale, 0.6, 1.6, fallback.scale),
+    opacity: clampFinite(pos.opacity, 0.25, 1.0, fallback.opacity),
+  };
+}
+
+export function cloneDefaultMobileLayout(): MobileLayoutConfig {
+  const copy = {} as MobileLayoutConfig;
+  for (const id of MOBILE_CONTROL_IDS) {
+    copy[id] = { ...DEFAULT_MOBILE_LAYOUT[id] };
+  }
+  return copy;
+}
+
+export function mergeMobileLayout(
+  partial?: Partial<Record<string, unknown>> | null
+): MobileLayoutConfig {
+  const merged = cloneDefaultMobileLayout();
+  if (!partial || typeof partial !== 'object') return merged;
+  for (const id of MOBILE_CONTROL_IDS) {
+    const raw = partial[id];
+    if (raw && typeof raw === 'object') {
+      merged[id] = clampMobileControlPosition(
+        raw as Partial<MobileControlPosition>,
+        DEFAULT_MOBILE_LAYOUT[id]
+      );
+    }
+  }
+  return merged;
+}
+
+export function loadMobileLayout(): MobileLayoutConfig {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(MOBILE_LAYOUT_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<Record<string, unknown>>;
+        return mergeMobileLayout(parsed);
+      }
+    }
+  } catch {
+    // Fallback to defaults if localStorage is unavailable or corrupt
+  }
+  return cloneDefaultMobileLayout();
+}
+
+export function saveMobileLayout(layout: MobileLayoutConfig): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(MOBILE_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+    }
+  } catch {
+    // Ignore storage quota / privacy mode errors
+  }
+}
+
+export function loadMobileControlsMode(): MobileControlsMode {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem(MOBILE_CONTROLS_STORAGE_KEY);
+      if (raw === 'auto' || raw === 'on' || raw === 'off') return raw;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return 'auto';
+}
+
+export function saveMobileControlsMode(mode: MobileControlsMode): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(MOBILE_CONTROLS_STORAGE_KEY, mode);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const hasTouchStart = 'ontouchstart' in window;
+  const hasMaxTouchPoints =
+    typeof navigator !== 'undefined' && (navigator.maxTouchPoints ?? 0) > 0;
+  const hasCoarsePointer =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  return hasTouchStart || hasMaxTouchPoints || hasCoarsePointer;
+}
+
 export const DEFAULT_SETTINGS: GameSettings = {
   graphics: 'high',
   sensitivity: 1.0,
@@ -258,4 +423,5 @@ export const DEFAULT_SETTINGS: GameSettings = {
     dynamicSpread: true,
   },
   keybinds: { ...DEFAULT_KEYBINDS },
+  mobileControls: 'auto',
 };

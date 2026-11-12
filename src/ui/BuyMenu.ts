@@ -40,6 +40,7 @@ export interface BuyMenuState {
   phaseRemainingSec: number;
   canBuyNow: boolean;
   cannotBuyReason?: string;
+  isTraining?: boolean;
 }
 
 export interface BuyMenuCallbacks {
@@ -498,7 +499,10 @@ export class BuyMenu {
       : 'Keine Primärwaffe';
 
     // Buy phase banner
-    if (state.canBuyNow) {
+    if (state.isTraining) {
+      this.phasePillEl.dataset.state = 'open';
+      this.phasePillEl.textContent = 'TRAININGSMODUS · FREIE AUSWAHL';
+    } else if (state.canBuyNow) {
       const rem = Math.max(0, Math.ceil(state.phaseRemainingSec));
       this.phasePillEl.dataset.state = 'open';
       this.phasePillEl.textContent = `KAUFPHASE AKTIV · ${rem}s`;
@@ -509,9 +513,14 @@ export class BuyMenu {
     }
 
     // Economy numbers
-    this.creditsValEl.textContent = `◆ ${formatSplitter(state.credits)}`;
-    const nextMin = Math.min(MAX_CREDITS, state.credits + LOSS_STREAK_CREDITS[0]);
-    this.nextMinValEl.textContent = `MIN. NÄCHSTE RUNDE: ◆ ${formatSplitter(nextMin)}`;
+    if (state.isTraining) {
+      this.creditsValEl.textContent = '◆ ∞';
+      this.nextMinValEl.textContent = 'TRAINING · KOSTENLOSE AUSRÜSTUNG';
+    } else {
+      this.creditsValEl.textContent = `◆ ${formatSplitter(state.credits)}`;
+      const nextMin = Math.min(MAX_CREDITS, state.credits + LOSS_STREAK_CREDITS[0]);
+      this.nextMinValEl.textContent = `MIN. NÄCHSTE RUNDE: ◆ ${formatSplitter(nextMin)}`;
+    }
 
     // Update Weapon Cards
     for (const [wId, btn] of this.weaponBtns.entries()) {
@@ -520,27 +529,30 @@ export class BuyMenu {
       const isActiveEquipped =
         (state.activeSlot === 1 && state.primaryWeapon === wId) ||
         (state.activeSlot === 2 && state.secondaryWeapon === wId);
-      const canAfford = state.credits >= w.price;
+      const canAfford = state.isTraining || state.credits >= w.price;
+      const blockOwnedClick = state.isTraining ? isActiveEquipped : isOwned;
 
       btn.classList.toggle('is-owned', isOwned);
       btn.classList.toggle('is-equipped', isActiveEquipped);
       btn.classList.toggle('is-unaffordable', !isOwned && !canAfford);
       btn.dataset.owned = isOwned ? 'true' : 'false';
-      btn.disabled = !state.canBuyNow || isOwned || !canAfford;
+      btn.disabled = !state.canBuyNow || blockOwnedClick || !canAfford;
 
       const badge = btn.querySelector('[data-badge]') as HTMLElement;
-      badge.textContent = isOwned
-        ? 'IM BESITZ'
-        : !canAfford
-          ? 'ZU TEUER'
-          : '';
+      badge.textContent = isActiveEquipped
+        ? 'AUSGERÜSTET'
+        : isOwned
+          ? 'IM BESITZ'
+          : !canAfford
+            ? 'ZU TEUER'
+            : '';
     }
 
     // Update Armor Cards
     for (const [aId, btn] of this.armorBtns.entries()) {
       const tier = ARMOR_TIERS[aId];
       const isOwned = state.armor >= tier.armor && state.armorMax === tier.armor;
-      const canAfford = state.credits >= tier.price;
+      const canAfford = state.isTraining || state.credits >= tier.price;
 
       btn.classList.toggle('is-owned', isOwned);
       btn.classList.toggle('is-equipped', isOwned);

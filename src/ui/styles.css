@@ -37,7 +37,9 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
   background: var(--bg-obsidian);
   color: var(--text-primary);
   font-family: var(--font-ui);
@@ -47,8 +49,9 @@ body {
 
 #app {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -57,6 +60,7 @@ body {
   width: 100%;
   height: 100%;
   outline: none;
+  touch-action: none;
 }
 
 #ui-root {
@@ -89,7 +93,12 @@ body {
   pointer-events: auto;
   display: flex;
   flex-direction: column;
-  padding: 0;
+  height: 100dvh;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
   overflow: hidden;
   background:
     radial-gradient(circle at center, rgba(5, 7, 12, 0.65) 0%, rgba(5, 7, 12, 0.95) 100%),
@@ -163,6 +172,7 @@ body {
   gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 .client-tablist::-webkit-scrollbar {
@@ -171,6 +181,7 @@ body {
 
 .client-nav-tab {
   position: relative;
+  flex-shrink: 0;
   appearance: none;
   border: none;
   background: transparent;
@@ -368,6 +379,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .client-tabpanel {
@@ -3950,7 +3963,7 @@ progress.shard-progress::-moz-progress-bar {
   inset: 0;
   z-index: 45;
   pointer-events: auto;
-  background: rgba(5, 7, 12, 0.94);
+  background: rgba(5, 7, 12, 0.96);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3972,7 +3985,7 @@ progress.shard-progress::-moz-progress-bar {
   justify-content: space-between;
   gap: 16px;
   padding: 11px 18px;
-  background: rgba(11, 18, 27, 0.95);
+  background: #090c13;
   border: 1px solid var(--border-muted);
   border-top: 2px solid var(--accent-cyan);
 }
@@ -3988,21 +4001,25 @@ progress.shard-progress::-moz-progress-bar {
   font-size: 1.05rem;
   font-weight: 900;
   letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 .buy-phase-pill {
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   padding: 4px 10px;
-  border: 1px solid rgba(24, 212, 201, 0.5);
-  background: rgba(24, 212, 201, 0.14);
+  border: 1px solid var(--accent-cyan);
+  background: #0e1420;
   color: var(--accent-cyan);
 }
 
 .buy-phase-pill[data-state='locked'] {
-  border-color: rgba(255, 107, 43, 0.55);
-  background: rgba(255, 107, 43, 0.14);
+  border-color: var(--accent-amber);
+  background: #1b1210;
   color: #ffb08e;
 }
 
@@ -4022,16 +4039,19 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-close-btn {
   padding: 7px 14px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--border-strong);
-  color: var(--text-primary);
+  background: #0e1420;
+  border: 1px solid var(--border-muted);
+  color: #ffffff;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   cursor: pointer;
 }
 
 .buy-close-btn:hover {
+  background: #141d2e;
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
 }
@@ -4052,7 +4072,7 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-loadout-card,
 .buy-economy-card {
-  background: rgba(13, 21, 31, 0.94);
+  background: #0e1420;
   border: 1px solid var(--border-muted);
   padding: 14px;
   display: flex;
@@ -4072,6 +4092,7 @@ progress.shard-progress::-moz-progress-bar {
   font-size: 0.65rem;
   font-weight: 900;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--accent-amber);
 }
 
@@ -4084,6 +4105,7 @@ progress.shard-progress::-moz-progress-bar {
   font-size: 0.62rem;
   font-weight: 800;
   padding: 2px 6px;
+  background: #090c13;
   border: 1px solid var(--accent-gold);
   color: var(--accent-gold);
 }
@@ -4093,6 +4115,7 @@ progress.shard-progress::-moz-progress-bar {
   margin-top: 4px;
   font-size: 1.1rem;
   font-weight: 900;
+  color: #ffffff;
 }
 
 .buy-specialist-tag {
@@ -4102,6 +4125,7 @@ progress.shard-progress::-moz-progress-bar {
   gap: 6px;
   font-family: var(--font-mono);
   font-size: 0.66rem;
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -4119,8 +4143,8 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-equipped-slot {
   padding: 8px 10px;
-  background: rgba(8, 14, 21, 0.88);
-  border: 1px solid rgba(145, 175, 205, 0.18);
+  background: #090c13;
+  border: 1px solid var(--border-muted);
   display: grid;
   grid-template-columns: 74px minmax(0, 1fr);
   grid-template-rows: auto auto;
@@ -4134,7 +4158,7 @@ progress.shard-progress::-moz-progress-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f2f7fc;
+  color: #ffffff;
 }
 
 .eq-slot-svg svg {
@@ -4151,21 +4175,26 @@ progress.shard-progress::-moz-progress-bar {
 .eq-slot-label {
   font-family: var(--font-mono);
   font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
 .eq-slot-val {
   font-size: 0.8rem;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .buy-credits-caption {
   display: block;
   font-family: var(--font-mono);
   font-size: 0.64rem;
+  font-weight: 900;
   letter-spacing: 0.12em;
-  color: var(--text-secondary);
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 .buy-credits-val {
@@ -4180,6 +4209,7 @@ progress.shard-progress::-moz-progress-bar {
 .buy-credits-next {
   font-family: var(--font-mono);
   font-size: 0.68rem;
+  font-weight: 700;
   color: var(--text-secondary);
 }
 
@@ -4191,18 +4221,25 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-callout-btn {
   padding: 8px 6px;
-  background: rgba(18, 29, 42, 0.9);
-  border: 1px solid var(--border-strong);
+  background: #090c13;
+  border: 1px solid var(--border-muted);
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 0.66rem;
   font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   cursor: pointer;
+}
+
+.buy-callout-btn:hover {
+  background: #141d2e;
+  color: #ffffff;
 }
 
 .buy-callout-btn[aria-pressed='true'] {
   border-color: var(--accent-cyan);
-  background: rgba(24, 212, 201, 0.18);
+  background: #141d2e;
   color: #ffffff;
 }
 
@@ -4241,11 +4278,12 @@ progress.shard-progress::-moz-progress-bar {
   margin: 0;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.13em;
-  color: var(--text-secondary);
+  text-transform: uppercase;
+  color: #ffffff;
   padding-bottom: 4px;
-  border-bottom: 1px solid rgba(145, 175, 205, 0.2);
+  border-bottom: 1px solid var(--border-muted);
 }
 
 .buy-col-stack {
@@ -4259,9 +4297,9 @@ progress.shard-progress::-moz-progress-bar {
   flex: 1;
   min-height: 114px;
   padding: 9px 11px;
-  background: #111a24;
-  border: 1px solid rgba(145, 175, 205, 0.24);
-  color: var(--text-primary);
+  background: #0e1420;
+  border: 1px solid var(--border-muted);
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -4272,17 +4310,14 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-item-card:hover:not(:disabled) {
   border-color: var(--accent-cyan);
-  background: #162433;
+  background: #141d2e;
 }
 
-/* Glowing Turquoise Owned State (#18d4c9) */
 .buy-item-card.is-owned,
 .buy-item-card[data-owned='true'] {
-  border-color: #18d4c9;
-  background: linear-gradient(180deg, rgba(24, 212, 201, 0.15) 0%, rgba(24, 212, 201, 0.27) 100%);
-  box-shadow:
-    inset 0 0 18px rgba(24, 212, 201, 0.18),
-    0 0 10px rgba(24, 212, 201, 0.16);
+  border-color: var(--accent-cyan);
+  border-left: 3px solid var(--accent-cyan);
+  background: #141d2e;
 }
 
 .buy-item-card.is-unaffordable {
@@ -4304,6 +4339,7 @@ progress.shard-progress::-moz-progress-bar {
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--accent-cyan);
 }
 
@@ -4316,7 +4352,7 @@ progress.shard-progress::-moz-progress-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f4f8fc;
+  color: #ffffff;
 }
 
 .buy-card-svg-wrap svg {
@@ -4341,8 +4377,9 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-card-name {
   font-size: 0.84rem;
-  font-weight: 800;
-  color: var(--text-primary);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 /* Bottom FÄHIGKEITEN 3-Card Row */
@@ -4361,9 +4398,9 @@ progress.shard-progress::-moz-progress-bar {
 .buy-ability-card {
   min-height: 108px;
   padding: 9px 12px;
-  background: #111a24;
-  border: 1px solid rgba(145, 175, 205, 0.24);
-  color: var(--text-primary);
+  background: #0e1420;
+  border: 1px solid var(--border-muted);
+  color: #ffffff;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -4374,12 +4411,13 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-ability-card:hover:not(:disabled) {
   border-color: var(--char-accent, var(--accent-cyan));
-  background: #162433;
+  background: #141d2e;
 }
 
 .buy-ability-card.is-owned {
-  border-color: #18d4c9;
-  background: linear-gradient(180deg, rgba(24, 212, 201, 0.13) 0%, rgba(24, 212, 201, 0.23) 100%);
+  border-color: var(--accent-cyan);
+  border-left: 3px solid var(--accent-cyan);
+  background: #141d2e;
 }
 
 .buy-ability-card.is-unaffordable {
@@ -4413,7 +4451,7 @@ progress.shard-progress::-moz-progress-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f4f8fc;
+  color: #ffffff;
 }
 
 .buy-ab-svg-wrap svg {
@@ -4437,12 +4475,14 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-ab-name {
   font-size: 0.8rem;
-  font-weight: 800;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 /* Right DETAILS Inspector & Distance Damage Table */
 .buy-detail-panel {
-  background: rgba(13, 21, 31, 0.96);
+  background: #0e1420;
   border: 1px solid var(--border-muted);
   padding: 16px;
   display: flex;
@@ -4456,8 +4496,9 @@ progress.shard-progress::-moz-progress-bar {
   justify-content: space-between;
   font-family: var(--font-mono);
   font-size: 0.64rem;
-  font-weight: 800;
+  font-weight: 900;
   letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .buy-detail-heading-tag {
@@ -4473,6 +4514,8 @@ progress.shard-progress::-moz-progress-bar {
   font-size: 1.35rem;
   font-weight: 900;
   letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ffffff;
 }
 
 .buy-detail-price {
@@ -4485,8 +4528,8 @@ progress.shard-progress::-moz-progress-bar {
 .buy-detail-svg-preview {
   height: 78px;
   padding: 10px;
-  background: rgba(8, 13, 20, 0.85);
-  border: 1px solid rgba(145, 175, 205, 0.18);
+  background: #090c13;
+  border: 1px solid var(--border-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4522,7 +4565,7 @@ progress.shard-progress::-moz-progress-bar {
   justify-content: space-between;
   gap: 8px;
   padding: 5px 0;
-  border-bottom: 1px solid rgba(145, 175, 205, 0.12);
+  border-bottom: 1px solid var(--border-muted);
   font-size: 0.74rem;
 }
 
@@ -4532,7 +4575,7 @@ progress.shard-progress::-moz-progress-bar {
 
 .detail-stat-row strong {
   font-family: var(--font-mono);
-  color: var(--text-primary);
+  color: #ffffff;
 }
 
 .buy-damage-table {
@@ -4540,15 +4583,15 @@ progress.shard-progress::-moz-progress-bar {
   border-collapse: collapse;
   font-family: var(--font-mono);
   font-size: 0.74rem;
-  background: rgba(8, 13, 20, 0.78);
-  border: 1px solid rgba(145, 175, 205, 0.2);
+  background: #090c13;
+  border: 1px solid var(--border-muted);
 }
 
 .buy-damage-table th,
 .buy-damage-table td {
   padding: 6px 8px;
   text-align: right;
-  border-bottom: 1px solid rgba(145, 175, 205, 0.14);
+  border-bottom: 1px solid var(--border-muted);
 }
 
 .buy-damage-table th:first-child {
@@ -4558,8 +4601,10 @@ progress.shard-progress::-moz-progress-bar {
 
 .buy-damage-table thead th {
   font-size: 0.64rem;
-  color: var(--text-muted);
-  background: rgba(16, 26, 38, 0.85);
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: #141d2e;
 }
 
 .buy-damage-table td.is-head-dmg {
@@ -5146,6 +5191,24 @@ input[type='range'].shard-slider::-moz-range-thumb {
    6. RESPONSIVE ADAPTATIONS
    ============================================================================ */
 
+/* Scrollable dialog tab strip (if present) */
+.dialog-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dialog-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.dialog-tabs > * {
+  flex-shrink: 0;
+}
+
 @media (max-width: 1180px) {
   .client-main-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -5171,26 +5234,613 @@ input[type='range'].shard-slider::-moz-range-thumb {
   }
 }
 
-@media (max-width: 860px) {
-  .client-topbar {
+@media (max-width: 1024px) {
+  .client-main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .client-tabpanel {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .client-panel-inner.is-play-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100%;
+    gap: 16px;
+  }
+
+  .play-left-column {
+    width: 100%;
+    max-width: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+
+  .play-subnav-btn {
+    min-height: 44px;
+    padding: 8px 6px;
+  }
+
+  .play-center-stage,
+  .play-squad-stage {
+    width: 100%;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 960px) {
+  .client-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
     padding: 8px 12px;
+    gap: 8px 12px;
+  }
+
+  .client-brand {
+    order: 1;
+  }
+
+  .client-topbar-right {
+    order: 2;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .client-tablist {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+    border-top: 1px solid var(--border-muted);
+  }
+
+  .client-nav-tab {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.78rem;
+  }
+
+  .client-nav-tab.is-play-emblem {
+    margin: 5px 6px 5px 0;
+    padding: 0 18px;
+  }
+
+  .client-panel-inner {
+    padding: 14px;
+  }
+
+  .objectives-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .arsenal-columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  /* Buy Menu: Single scrollable grid & tappable buttons */
+  .shard-buy-overlay {
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+    align-items: flex-start;
+  }
+
+  .buy-shell {
+    max-height: 92dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 10px;
+  }
+
+  .buy-topbar {
+    flex-wrap: wrap;
+    padding: 10px 12px;
     gap: 8px;
   }
 
-  .client-panel-inner.is-play-layout,
-  .objectives-grid,
-  .settings-columns {
+  .buy-columns-grid,
+  .buy-abilities-row {
     grid-template-columns: 1fr;
+  }
+
+  .buy-close-btn,
+  .buy-callout-btn {
+    min-height: 44px;
+  }
+
+  .buy-item-card,
+  .buy-ability-card {
+    min-height: 96px;
+    padding: 10px 12px;
+  }
+
+  /* In-Game HUD: Compact mobile scaling */
+  .hud-micro-telemetry {
+    left: 10px;
+    font-size: 0.58rem;
+  }
+
+  .hud-top-bar {
+    top: 18px;
+    left: 10px;
+    right: 10px;
+    gap: 8px;
+  }
+
+  .shard-minimap {
+    top: 20px;
+    left: 10px;
+    width: 124px;
+    height: 124px;
+  }
+
+  .minimap-canvas {
+    width: 124px;
+    height: 124px;
+  }
+
+  .hud-round-header {
+    top: 0;
+  }
+
+  .round-team-side {
+    min-width: auto;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .round-spec-pip {
+    width: 18px;
+    height: 18px;
+    padding: 2px;
+  }
+
+  .round-score-num {
+    font-size: 1.12rem;
+  }
+
+  .round-center-clock {
+    min-width: 96px;
+    padding: 4px 8px;
+  }
+
+  .round-main-timer {
+    font-size: 1.05rem;
+  }
+
+  .hud-kill-feed {
+    min-width: 0;
+    max-width: 38vw;
+    gap: 3px;
+  }
+
+  .hud-feed-entry {
+    padding: 3px 7px;
+    font-size: 0.66rem;
+    gap: 4px;
+  }
+
+  .hud-left-hints {
+    top: 150px;
+    left: 10px;
+    gap: 4px;
+  }
+
+  .hud-key-pill {
+    padding: 3px 7px;
+    font-size: 0.62rem;
+  }
+
+  .hud-f1-card,
+  .hud-f2-card {
+    top: 150px;
+    left: 10px;
+    width: min(300px, calc(100vw - 20px));
+  }
+
+  .hud-bottom-left {
+    left: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+
+  .hud-vitals-sym {
+    padding: 4px 9px;
+    gap: 8px;
+  }
+
+  .hud-shield-hex {
+    width: 20px;
+    height: 20px;
+  }
+
+  .hud-shield-value {
+    font-size: 1rem;
+  }
+
+  .hud-hp-value {
+    font-size: 1.9rem;
+  }
+
+  .hud-sym-slash {
+    font-size: 1.5rem;
+  }
+
+  .hud-bottom-center {
+    bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  .hud-center-bars {
+    width: 210px;
+  }
+
+  .hud-ability-row-wrap,
+  .hud-ability-bar {
+    gap: 5px;
+  }
+
+  .hud-ability-slot,
+  .hud-kern-slot-tile {
+    min-width: 54px;
+    padding: 5px 6px 4px;
+  }
+
+  .ability-slot-svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .hud-bottom-right {
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    gap: 5px;
+  }
+
+  .hud-slot-silhouette {
+    width: 122px;
+    padding: 3px 7px;
+  }
+
+  .slot-sil-svg,
+  .slot-sil-svg svg {
+    height: 16px;
+  }
+
+  .hud-ammo-sym-row {
+    padding: 4px 9px;
+    gap: 8px;
+  }
+
+  .hud-ammo-mag {
+    font-size: 1.9rem;
+  }
+
+  .hud-ammo-reserve {
+    font-size: 1rem;
+  }
+
+  .hud-kern-action-box {
+    min-width: 0;
+    width: min(300px, 88vw);
+  }
+
+  .hud-round-banner {
+    max-width: 92vw;
+    padding: 10px 22px;
+  }
+
+  .round-banner-headline {
+    font-size: 1.2rem;
+  }
+
+  .shard-chat {
+    left: 10px;
+    bottom: 92px;
+    width: min(300px, 60vw);
+  }
+}
+
+@media (max-width: 720px) {
+  /* Mode & Map Drawer: Clean centered modal on mobile */
+  dialog.lobby-mode-drawer {
+    margin: auto;
+    width: min(96vw, 720px);
+    max-width: 96vw;
+    height: auto;
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid var(--border-strong);
+    border-top: 2px solid var(--accent-cyan);
+  }
+
+  .mode-drawer-inner {
+    height: auto;
+  }
+
+  /* Pause / Settings Dialog */
+  dialog.shard-dialog {
+    width: min(96vw, 860px);
+    max-width: 96vw;
+    max-height: 90dvh;
+  }
+
+  .dialog-header {
+    padding: 12px 14px;
+  }
+
+  .dialog-body {
+    padding: 12px 14px;
+    max-height: calc(90dvh - 64px);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-columns,
+  .map-select-grid,
+  .offline-specialist-grid,
+  .dialog-primary-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .netsim-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Scoreboard & Match-End Overlays */
+  .shard-tab-scoreboard,
+  .shard-matchend-overlay {
+    padding: 10px;
+  }
+
+  .tabsb-shell,
+  .matchend-shell {
+    max-width: 96vw;
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 14px;
+  }
+
+  .tabsb-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+    gap: 6px;
+  }
+
+  .tabsb-score {
+    justify-content: center;
+  }
+
+  .tabsb-hint {
+    justify-self: center;
+  }
+
+  .tabsb-team {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .spec-hero-portrait {
+    height: 240px;
   }
 
   .party-banners-stage {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    min-height: 280px;
   }
 
   .party-banner:nth-child(1),
   .party-banner:nth-child(5) {
     display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .client-brand-copy .lobby-brand-subtitle,
+  .lobby-auth-badge {
+    display: none;
+  }
+
+  .drawer-room-options {
+    grid-template-columns: 1fr;
+  }
+
+  .drawer-mode-tile {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .party-banners-stage {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .party-banner:nth-child(1),
+  .party-banner:nth-child(2),
+  .party-banner:nth-child(4),
+  .party-banner:nth-child(5) {
+    display: none;
+  }
+
+  .play-bottom-cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .play-cta-buttons {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .play-primary-cta,
+  .play-primary-cta.is-find-match {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .arsenal-columns,
+  .quality-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .showcase-metrics-grid,
+  .obj-diamonds-track {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .showcase-big-title,
+  .matchend-outcome {
+    font-size: 1.55rem;
+  }
+
+  .history-match-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .history-kda-box {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  /* Portrait phone HUD: prevent bottom-center from overlapping bottom-left/right */
+  .round-alive-pips {
+    display: none;
+  }
+
+  .hud-bottom-center {
+    bottom: max(70px, calc(env(safe-area-inset-bottom) + 64px));
+  }
+
+  .hud-loadout-slots {
+    display: none;
+  }
+}
+
+/* Landscape smartphones (short viewport height) */
+@media (max-height: 520px) {
+  .client-topbar {
+    min-height: 44px;
+    padding: 4px 10px;
+  }
+
+  .client-nav-tab {
+    min-height: 36px;
+    font-size: 0.72rem;
+  }
+
+  .shard-minimap {
+    top: 16px;
+    left: 8px;
+    width: 104px;
+    height: 104px;
+  }
+
+  .minimap-canvas {
+    width: 104px;
+    height: 104px;
+  }
+
+  .hud-micro-telemetry {
+    font-size: 0.55rem;
+  }
+
+  .hud-left-hints,
+  .hud-loadout-slots {
+    display: none;
+  }
+
+  .round-team-side {
+    min-width: auto;
+    padding: 3px 8px;
+    gap: 5px;
+  }
+
+  .round-spec-pip {
+    width: 16px;
+    height: 16px;
+  }
+
+  .round-score-num {
+    font-size: 1rem;
+  }
+
+  .round-center-clock {
+    min-width: 84px;
+    padding: 3px 6px;
+  }
+
+  .round-main-timer {
+    font-size: 0.96rem;
+  }
+
+  .hud-bottom-left {
+    left: 8px;
+    bottom: 6px;
+  }
+
+  .hud-bottom-center {
+    bottom: 6px;
+    gap: 4px;
+  }
+
+  .hud-bottom-right {
+    right: 8px;
+    bottom: 6px;
+  }
+
+  .hud-center-bars {
+    width: 180px;
+  }
+
+  .hud-ability-slot,
+  .hud-kern-slot-tile {
+    min-width: 48px;
+    padding: 3px 5px;
+  }
+
+  .ability-slot-svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .hud-hp-value,
+  .hud-ammo-mag {
+    font-size: 1.65rem;
+  }
+
+  .hud-shield-value,
+  .hud-ammo-reserve {
+    font-size: 0.9rem;
+  }
+
+  .hud-vitals-sym,
+  .hud-ammo-sym-row {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+
+  .shard-chat {
+    left: 8px;
+    bottom: 72px;
+    width: min(240px, 40vw);
   }
 }
 

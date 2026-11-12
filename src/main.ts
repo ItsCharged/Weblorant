@@ -4,6 +4,7 @@ import { SynthAudio } from './audio/SynthAudio';
 import {
   BUY_PHASE_SEC,
   DEFAULT_SETTINGS,
+  loadMobileControlsMode,
   loadSavedKeybinds,
   saveKeybinds,
   SIM_TICK_RATE,
@@ -36,6 +37,7 @@ import {
 import { CHARACTER_LIST, DEFAULT_CHARACTER_ID, TEAM_DEFS } from './data/characters';
 import { getMapDefinition } from './data/maps';
 import { recordMatchHistory, recordProgress } from './data/progression';
+import { WEAPONS } from './data/weapons';
 import {
   getFirebaseServices,
   isFirebaseConfigured,
@@ -73,6 +75,7 @@ import {
   type ScoreboardRow,
   ScoreboardOverlay,
 } from './ui/ScoreboardOverlay';
+import { TouchControls } from './ui/TouchControls';
 
 export type ScreenMode = 'landing' | 'lobby' | 'in_game';
 
@@ -210,6 +213,7 @@ async function bootstrap(): Promise<void> {
     graphics: loadGraphicsQuality(),
     crosshair: { ...DEFAULT_SETTINGS.crosshair },
     keybinds: loadSavedKeybinds(),
+    mobileControls: loadMobileControlsMode(),
   };
 
   let screenMode: ScreenMode = 'landing';
@@ -358,6 +362,15 @@ async function bootstrap(): Promise<void> {
   });
   input.setAngles(initialMap.playerSpawn.yaw, 0);
 
+  const touchControls = new TouchControls(uiRoot, input, settings.mobileControls, {
+    onPauseMenu: () => {
+      if (screenMode === 'in_game') {
+        audio.resume();
+        hud.openMenu();
+      }
+    },
+  });
+
   // Low-frequency Firebase RTDB match summary writer (Host only; ONLY on roundNumber or phase transition)
   const syncHostMatchSummaryToRtdb = (
     roomCode: string,
@@ -387,28 +400,34 @@ async function bootstrap(): Promise<void> {
     }
   };
 
+  const handleBuyRequest = (itemType: BuyItemType, itemId: string): void => {
+    audio.resume();
+    if (onlineSession) {
+      onlineSession.requestBuy(itemType, itemId);
+      return;
+    }
+    if (itemType === 'weapon') {
+      const wId = itemId as WeaponId;
+      syncOfflineWeaponSlot(wId);
+      audio.playBuySuccess();
+      buyMenu.showPurchaseFeedback(true, `${WEAPONS[wId]?.name ?? 'Waffe'} ausgerüstet.`);
+    } else if (itemType === 'armor') {
+      session.playerShield = itemId === 'heavy' ? 50 : 25;
+      audio.playBuySuccess();
+      buyMenu.showPurchaseFeedback(
+        true,
+        itemId === 'heavy' ? 'Schwerer Schild (50) angelegt.' : 'Leichter Schild (25) angelegt.'
+      );
+    } else if (itemType === 'ability_q' || itemType === 'ability_e') {
+      session.refillFullAbilities();
+      audio.playBuySuccess();
+      buyMenu.showPurchaseFeedback(true, 'Fähigkeiten aufgefüllt.');
+    }
+  };
+
   // Phase 4 Buy Menu & Match-End / Live Scoreboard Overlays
   const buyMenu = new BuyMenu(uiRoot, {
-    onBuyRequest: (itemType: BuyItemType, itemId: string) => {
-      audio.resume();
-      if (onlineSession) {
-        onlineSession.requestBuy(itemType, itemId);
-      } else {
-        if (itemType === 'weapon') {
-          syncOfflineWeaponSlot(itemId as WeaponId);
-          audio.playBuySuccess();
-          buyMenu.showPurchaseFeedback(true, 'Waffe ausgerüstet.');
-        } else if (itemType === 'armor') {
-          session.playerShield = itemId === 'heavy' ? 50 : 25;
-          audio.playBuySuccess();
-          buyMenu.showPurchaseFeedback(true, 'Schild angelegt.');
-        } else if (itemType === 'ability_q' || itemType === 'ability_e') {
-          session.refillFullAbilities();
-          audio.playBuySuccess();
-          buyMenu.showPurchaseFeedback(true, 'Fähigkeiten aufgefüllt.');
-        }
-      }
-    },
+    onBuyRequest: handleBuyRequest,
     onClose: () => {
       if (screenMode === 'in_game' && !matchEndOverlay.isOpen() && !hud.isMenuOpen()) {
         input.requestLock();
@@ -444,6 +463,7 @@ async function bootstrap(): Promise<void> {
     screenMode = 'landing';
     input.setSpectatorMode(false);
     input.exitLock();
+    touchControls.setGameplayState(false, false);
     hud.setGameplayActive(false);
     lobbyScreen.refreshProgression();
     lobbyScreen.showLanding();
@@ -914,7 +934,7 @@ async function bootstrap(): Promise<void> {
       if (onlineSession) {
         onlineSession.equipWeapon(weaponId);
       } else {
-        session.equipWeapon(weaponId);
+        syncOfflineWeaponSlot(weaponId);
       }
       audio.playUiBeep(true);
     },
@@ -941,6 +961,8 @@ async function bootstrap(): Promise<void> {
         }
       }
       input.setSensitivity(settings.sensitivity);
+      input.setKeybinds(settings.keybinds);
+      saveKeybinds(settings.keybinds);
       fpCamera.applySettings(settings);
       audio.setVolume(settings.volume);
     },
@@ -1035,7 +1057,12 @@ async function bootstrap(): Promise<void> {
 
       // If pointer lock was declined by automated/headless environment, open pause dialog cleanly
       window.setTimeout(() => {
-        if (screenMode === 'in_game' && !input.isPointerLocked()) {
+        if (
+          screenMode === 'in_game' &&
+          !input.isPointerLocked() &&
+          !input.isTouchMode() &&
+          !buyMenu.isOpen()
+        ) {
           hud.openMenu();
         }
       }, 120);
@@ -1928,7 +1955,7 @@ async function bootstrap(): Promise<void> {
           spreadDeg: session.currentSpreadDeg,
           isScopedFalke: offlineActiveSlot !== 3 && fpCamera.isScopedFalke(),
           scopeView: offlineActiveSlot !== 3 ? fpCamera.getScopeView() : undefined,
-          pointerLocked: input.isPointerLocked() || buyMenu.isOpen(),
+          pointerLocked: input.isPointerLocked() || input.isTouchMode() || buyMenu.isOpen(),
           challengeActive: challenge.active,
           challengeHits: challenge.hits,
           challengeRemaining: challenge.remaining,
@@ -2167,11 +2194,8 @@ async function bootstrap(): Promise<void> {
         scoreA: 0,
         scoreB: 0,
         credits: START_CREDITS,
-        primaryWeapon: session.weapon.weaponId === 'funke' || session.weapon.weaponId === 'bolzer'
-          ? null
-          : session.weapon.weaponId,
-        secondaryWeapon:
-          session.weapon.weaponId === 'bolzer' ? 'bolzer' : ('funke' as WeaponId),
+        primaryWeapon: offlinePrimaryWeapon,
+        secondaryWeapon: offlineSecondaryWeapon,
         armor: session.playerShield,
         hasKern: false,
         kernStatus: 'carried' as KernStatus,
@@ -2181,7 +2205,7 @@ async function bootstrap(): Promise<void> {
       });
     },
     requestBuy: (itemType: BuyItemType, itemId: string): void => {
-      onlineSession?.requestBuy(itemType, itemId);
+      handleBuyRequest(itemType, itemId);
     },
     castAbility: (slot: AbilitySlot): boolean => {
       audio.resume();

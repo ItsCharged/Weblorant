@@ -18,6 +18,19 @@ import type { MapBlock, MapDefinition } from '../data/maps/types';
  * Orientation: north-up (−Z points up on the canvas), so the layout never spins.
  */
 
+export type MinimapPingType = 'danger' | 'alert' | 'assist' | 'defend' | 'ping';
+
+export interface MinimapPing {
+  id: number;
+  x: number;
+  z: number;
+  type: MinimapPingType;
+  color?: string;
+  durationSec: number;
+  remainingSec: number;
+  label?: string;
+}
+
 export interface MinimapMarker {
   uid: string;
   pos: Vec3;
@@ -41,6 +54,15 @@ export interface MinimapFrame {
   effects?: ReadonlyArray<ActiveWorldEffect>;
   phase?: MatchPhase | null;
   barriersActive?: boolean;
+  /** Optional external pings rendered alongside internal timed pings. */
+  pings?: ReadonlyArray<{
+    x: number;
+    z: number;
+    type?: MinimapPingType;
+    color?: string;
+    progress01?: number;
+    label?: string;
+  }>;
 }
 
 const CSS_SIZE = 208;
@@ -50,6 +72,7 @@ const COLOR_ALLY = '#18d4c9';
 const COLOR_ENEMY = '#ff5847';
 const COLOR_KERN = '#ffb03a';
 const COLOR_SELF = '#ffffff';
+const COLOR_PING_DEFAULT = '#f5e663';
 
 export class Minimap {
   private readonly root: HTMLElement;
@@ -67,6 +90,8 @@ export class Minimap {
   private visible = false;
   private pulseT = 0;
   private lastBarriersActive: boolean | null = null;
+  private pings: MinimapPing[] = [];
+  private nextPingId = 1;
 
   constructor(container: HTMLElement) {
     this.root = document.createElement('div');
@@ -124,8 +149,51 @@ export class Minimap {
     this.renderBase(true, this.lastBarriersActive ?? false);
   }
 
+  /**
+   * Add a tactical ping marker on the minimap with pulsing ring and fade-out timer.
+   * Returns the assigned ping ID.
+   */
+  public addPing(
+    x: number,
+    z: number,
+    type: MinimapPingType = 'ping',
+    color?: string,
+    durationSec = 4.5,
+    label?: string
+  ): number {
+    const safeDuration = Math.max(0.25, durationSec);
+    const id = this.nextPingId++;
+    this.pings.push({
+      id,
+      x,
+      z,
+      type,
+      color,
+      durationSec: safeDuration,
+      remainingSec: safeDuration,
+      label,
+    });
+    // Cap concurrent pings to keep the minimap readable
+    if (this.pings.length > 16) {
+      this.pings.shift();
+    }
+    return id;
+  }
+
+  public clearPings(): void {
+    this.pings.length = 0;
+  }
+
+  public getActivePings(): ReadonlyArray<MinimapPing> {
+    return this.pings;
+  }
+
+  private getTargetDpr(): number {
+    return Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+  }
+
   private resizeBacking(): void {
-    this.dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    this.dpr = this.getTargetDpr();
     const px = Math.round(CSS_SIZE * this.dpr);
     this.canvas.width = px;
     this.canvas.height = px;
@@ -229,32 +297,44 @@ export class Minimap {
     for (const z of map.zones) {
       if (z.type !== 'kern_site_a' && z.type !== 'kern_site_b') continue;
       const isA = z.type === 'kern_site_a';
-      const x0 = this.toScreenX(z.center.x - z.size.x / 2);
-      const y0 = this.toScreenY(z.center.z - z.size.z / 2);
-      const w = z.size.x * this.scale;
-      const h = z.size.z * this.scale;
-      ctx.fillStyle = isA ? 'rgba(255, 107, 43, 0.2)' : 'rgba(24, 212, 201, 0.2)';
+      const x0 = Math.round(this.toScreenX(z.center.x - z.size.x / 2));
+      const y0 = Math.round(this.toScreenY(z.center.z - z.size.z / 2));
+      const w = Math.round(z.size.x * this.scale);
+      const h = Math.round(z.size.z * this.scale);
+      ctx.fillStyle = isA ? 'rgba(255, 107, 43, 0.22)' : 'rgba(24, 212, 201, 0.22)';
       ctx.fillRect(x0, y0, w, h);
       ctx.strokeStyle = isA ? '#ff6b2b' : '#18d4c9';
-      ctx.lineWidth = 1.4;
-      ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
-      ctx.fillStyle = isA ? '#ffb08e' : '#9ffaf3';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x0 + 0.5, y0 + 0.5, Math.max(1, w - 1), Math.max(1, h - 1));
+
+      const cx = this.toScreenX(z.center.x);
+      const cy = this.toScreenY(z.center.z);
+      const label = isA ? 'A' : 'B';
       ctx.font = '900 13px "Segoe UI", system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(isA ? 'A' : 'B', this.toScreenX(z.center.x), this.toScreenY(z.center.z));
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(5, 9, 14, 0.92)';
+      ctx.strokeText(label, cx, cy);
+      ctx.fillStyle = isA ? '#ffc2a6' : '#b2fcf6';
+      ctx.fillText(label, cx, cy);
     }
 
     // Spawn zones (subtle)
     for (const z of map.zones) {
       if (z.type !== 'spawn_attacker' && z.type !== 'spawn_defender') continue;
-      const x0 = this.toScreenX(z.center.x - z.size.x / 2);
-      const y0 = this.toScreenY(z.center.z - z.size.z / 2);
+      const x0 = Math.round(this.toScreenX(z.center.x - z.size.x / 2));
+      const y0 = Math.round(this.toScreenY(z.center.z - z.size.z / 2));
       ctx.strokeStyle =
         z.type === 'spawn_attacker' ? 'rgba(255, 107, 43, 0.45)' : 'rgba(24, 212, 201, 0.45)';
       ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1;
-      ctx.strokeRect(x0 + 0.5, y0 + 0.5, z.size.x * this.scale - 1, z.size.z * this.scale - 1);
+      ctx.strokeRect(
+        x0 + 0.5,
+        y0 + 0.5,
+        Math.max(1, Math.round(z.size.x * this.scale) - 1),
+        Math.max(1, Math.round(z.size.z * this.scale) - 1)
+      );
       ctx.setLineDash([]);
     }
 
@@ -270,7 +350,7 @@ export class Minimap {
 
     // Callout labels
     if (map.callouts) {
-      ctx.fillStyle = 'rgba(214, 229, 244, 0.55)';
+      ctx.fillStyle = 'rgba(214, 229, 244, 0.62)';
       ctx.font = '700 7px "Cascadia Mono", Consolas, monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -279,8 +359,8 @@ export class Minimap {
       }
     }
 
-    // Frame
-    ctx.strokeStyle = 'rgba(145, 175, 205, 0.4)';
+    // Crisp tactical frame + inner accent
+    ctx.strokeStyle = 'rgba(165, 198, 228, 0.52)';
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, CSS_SIZE - 1, CSS_SIZE - 1);
   }
@@ -391,9 +471,140 @@ export class Minimap {
     }
   }
 
+  private drawViewCone(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    yaw: number,
+    coneLen: number,
+    halfAngleRad: number,
+    rgb: string,
+    centerAlpha: number,
+    edgeAlpha: number
+  ): void {
+    const fx = -Math.sin(yaw);
+    const fy = -Math.cos(yaw);
+    const ang = Math.atan2(fy, fx);
+
+    const grad = ctx.createRadialGradient(x, y, 1, x, y, coneLen);
+    grad.addColorStop(0, `rgba(${rgb}, ${centerAlpha})`);
+    grad.addColorStop(0.65, `rgba(${rgb}, ${(centerAlpha * 0.35).toFixed(3)})`);
+    grad.addColorStop(1, `rgba(${rgb}, 0)`);
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.arc(x, y, coneLen, ang - halfAngleRad, ang + halfAngleRad);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    if (edgeAlpha > 0) {
+      const leftAng = ang - halfAngleRad;
+      const rightAng = ang + halfAngleRad;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(leftAng) * coneLen * 0.92, y + Math.sin(leftAng) * coneLen * 0.92);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(rightAng) * coneLen * 0.92, y + Math.sin(rightAng) * coneLen * 0.92);
+      ctx.strokeStyle = `rgba(${rgb}, ${edgeAlpha})`;
+      ctx.lineWidth = 0.85;
+      ctx.stroke();
+    }
+  }
+
+  private resolvePingColor(type: MinimapPingType, explicitColor?: string): string {
+    if (explicitColor) return explicitColor;
+    switch (type) {
+      case 'danger':
+      case 'alert':
+        return COLOR_ENEMY;
+      case 'assist':
+        return COLOR_ALLY;
+      case 'defend':
+        return COLOR_KERN;
+      case 'ping':
+      default:
+        return COLOR_PING_DEFAULT;
+    }
+  }
+
+  private drawPing(
+    ctx: CanvasRenderingContext2D,
+    worldX: number,
+    worldZ: number,
+    type: MinimapPingType,
+    color: string,
+    ageSec: number,
+    alpha: number,
+    label?: string
+  ): void {
+    if (alpha <= 0.01) return;
+    const x = Math.max(8, Math.min(CSS_SIZE - 8, this.toScreenX(worldX)));
+    const y = Math.max(8, Math.min(CSS_SIZE - 8, this.toScreenY(worldZ)));
+
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+    // Dual staggered pulsing rings
+    for (let i = 0; i < 2; i++) {
+      const phase = (ageSec * 1.35 + i * 0.5) % 1;
+      const ringR = 4 + phase * 12;
+      const ringAlpha = (1 - phase) * 0.85;
+      ctx.beginPath();
+      ctx.arc(x, y, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = Math.max(0, Math.min(1, alpha * ringAlpha));
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
+    // Center tactical glyph
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    if (type === 'danger' || type === 'alert' || type === 'defend') {
+      this.drawKernGlyph(ctx, x, y, 4.2, color);
+    } else {
+      ctx.beginPath();
+      ctx.arc(x, y, 3.3, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 1.1;
+      ctx.strokeStyle = 'rgba(5, 9, 14, 0.95)';
+      ctx.stroke();
+    }
+
+    if (label) {
+      ctx.font = '800 7px "Cascadia Mono", Consolas, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = 'rgba(5, 9, 14, 0.92)';
+      ctx.strokeText(label, x, y - 6);
+      ctx.fillStyle = color;
+      ctx.fillText(label, x, y - 6);
+    }
+
+    ctx.restore();
+  }
+
+  private tickPings(dt: number): void {
+    if (dt <= 0 || this.pings.length === 0) return;
+    for (let i = this.pings.length - 1; i >= 0; i--) {
+      this.pings[i].remainingSec -= dt;
+      if (this.pings[i].remainingSec <= 0) {
+        this.pings.splice(i, 1);
+      }
+    }
+  }
+
   public update(frame: MinimapFrame, frameDt: number): void {
+    const dt = Math.max(0, frameDt);
+    this.tickPings(dt);
     if (!this.visible || !this.mapDef) return;
-    this.pulseT += frameDt;
+    this.pulseT += dt;
+
+    if (this.getTargetDpr() !== this.dpr) {
+      this.resize();
+    }
 
     const barriersActive = Boolean(frame.barriersActive && frame.phase === 'buy');
     this.renderBase(false, barriersActive);
@@ -441,7 +652,8 @@ export class Minimap {
       this.drawDot(ctx, e.pos, COLOR_ENEMY, 3.4, e.yaw);
     }
 
-    // Allies
+    // Allies: subtle directional FOV cones when alive, then dots
+    const allyConeLen = Math.max(18, Math.min(26, 14 * this.scale));
     for (const a of frame.allies) {
       if (!a.alive) {
         const x = this.toScreenX(a.pos.x);
@@ -456,33 +668,71 @@ export class Minimap {
         ctx.stroke();
         continue;
       }
+      if (a.yaw !== undefined) {
+        this.drawViewCone(
+          ctx,
+          this.toScreenX(a.pos.x),
+          this.toScreenY(a.pos.z),
+          a.yaw,
+          allyConeLen,
+          0.56,
+          '24, 212, 201',
+          0.2,
+          0.18
+        );
+      }
       this.drawDot(ctx, a.pos, COLOR_ALLY, 3.4, a.yaw);
       if (a.hasKern) {
         this.drawKernGlyph(ctx, this.toScreenX(a.pos.x) + 5, this.toScreenY(a.pos.z) - 5, 2.8, COLOR_KERN);
       }
     }
 
-    // Local player view cone + marker
+    // Local player crisp directional FOV cone + marker
     const lx = this.toScreenX(frame.localPos.x);
     const ly = this.toScreenY(frame.localPos.z);
-    const fx = -Math.sin(frame.localYaw);
-    const fy = -Math.cos(frame.localYaw);
-    const coneLen = 26;
-    const half = 0.62;
-    const ang = Math.atan2(fy, fx);
-    const grad = ctx.createRadialGradient(lx, ly, 0, lx, ly, coneLen);
-    grad.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.beginPath();
-    ctx.moveTo(lx, ly);
-    ctx.arc(lx, ly, coneLen, ang - half, ang + half);
-    ctx.closePath();
-    ctx.fillStyle = grad;
-    ctx.fill();
+    const localConeLen = Math.max(24, Math.min(34, 18 * this.scale));
+    if (frame.localAlive) {
+      this.drawViewCone(ctx, lx, ly, frame.localYaw, localConeLen, 0.66, '255, 255, 255', 0.36, 0.36);
+    } else {
+      this.drawViewCone(ctx, lx, ly, frame.localYaw, localConeLen * 0.75, 0.66, '255, 255, 255', 0.12, 0);
+    }
 
     this.drawDot(ctx, frame.localPos, frame.localAlive ? COLOR_SELF : 'rgba(255,255,255,0.4)', 3.8, frame.localYaw);
     if (frame.localHasKern) {
       this.drawKernGlyph(ctx, lx + 6, ly - 6, 3, COLOR_KERN);
+    }
+
+    // Tactical ping markers (internal timed pings + optional frame pings)
+    for (const p of this.pings) {
+      const fadeAlpha = Math.min(1, p.remainingSec / Math.min(0.85, p.durationSec * 0.35));
+      const ageSec = p.durationSec - p.remainingSec;
+      this.drawPing(
+        ctx,
+        p.x,
+        p.z,
+        p.type,
+        this.resolvePingColor(p.type, p.color),
+        ageSec,
+        fadeAlpha,
+        p.label
+      );
+    }
+    if (frame.pings) {
+      for (const p of frame.pings) {
+        const type = p.type ?? 'ping';
+        const progress = Math.max(0, Math.min(1, p.progress01 ?? 0));
+        const alpha = progress > 0.75 ? (1 - progress) / 0.25 : 1;
+        this.drawPing(
+          ctx,
+          p.x,
+          p.z,
+          type,
+          this.resolvePingColor(type, p.color),
+          this.pulseT,
+          alpha,
+          p.label
+        );
+      }
     }
 
     ctx.restore();

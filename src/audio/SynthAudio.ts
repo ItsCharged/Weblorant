@@ -9,8 +9,12 @@ interface SpatialGainAndPan {
 export class SynthAudio {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private reverbSend: GainNode | null = null;
+  private reverbWet: GainNode | null = null;
+  private convolver: ConvolverNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
   private volume = 0.65;
+  private reverbMix = 0.28;
   private kernBeepTimer = 0;
   private wasKernPlantedActive = false;
 
@@ -25,13 +29,135 @@ export class SynthAudio {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return null;
-      this.ctx = new AudioCtx();
+      try {
+        this.ctx = new AudioCtx();
+      } catch {
+        return null;
+      }
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.volume;
       this.masterGain.connect(this.ctx.destination);
       this.noiseBuffer = this.buildNoiseBuffer(this.ctx, 1.2);
+      this.initReverbBus(this.ctx);
     }
     return this.ctx;
+  }
+
+  private initReverbBus(ctx: AudioContext): void {
+    if (!this.masterGain) return;
+    try {
+      const send = ctx.createGain();
+      send.gain.value = 1.0;
+
+      const wet = ctx.createGain();
+      wet.gain.value = this.reverbMix;
+      wet.connect(this.masterGain);
+
+      if (typeof ctx.createConvolver === 'function') {
+        const ir = this.buildReverbImpulseResponse(ctx, 0.85, 3.4);
+        const conv = ctx.createConvolver();
+        conv.buffer = ir;
+
+        if (typeof ctx.createBiquadFilter === 'function') {
+          const hp = ctx.createBiquadFilter();
+          hp.type = 'highpass';
+          hp.frequency.value = 180;
+
+          const lp = ctx.createBiquadFilter();
+          lp.type = 'lowpass';
+          lp.frequency.value = 3400;
+
+          send.connect(hp);
+          hp.connect(lp);
+          lp.connect(conv);
+        } else {
+          send.connect(conv);
+        }
+
+        conv.connect(wet);
+        this.convolver = conv;
+        this.reverbSend = send;
+        this.reverbWet = wet;
+        return;
+      }
+
+      if (typeof ctx.createDelay === 'function') {
+        // Lightweight delay-feedback fallback when ConvolverNode is unavailable
+        const delay = ctx.createDelay(0.5);
+        delay.delayTime.value = 0.042;
+        const fb = ctx.createGain();
+        fb.gain.value = 0.28;
+        send.connect(delay);
+        delay.connect(fb);
+        fb.connect(delay);
+        delay.connect(wet);
+        this.reverbSend = send;
+        this.reverbWet = wet;
+      }
+    } catch {
+      this.reverbSend = null;
+      this.reverbWet = null;
+      this.convolver = null;
+    }
+  }
+
+  /**
+   * Generates a 100% procedural stereo room impulse response with early reflections
+   * and an exponentially decaying, high-frequency-damped diffuse tail.
+   */
+  private buildReverbImpulseResponse(
+    ctx: AudioContext,
+    durationSec: number,
+    decay: number
+  ): AudioBuffer {
+    const length = Math.max(1, Math.floor(ctx.sampleRate * durationSec));
+    const buffer = ctx.createBuffer(2, length, ctx.sampleRate);
+    const earlyTapTimes = [0.007, 0.013, 0.021, 0.031, 0.044];
+
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buffer.getChannelData(ch);
+      let seed = ch === 0 ? 0x243f6a88 : 0x85a308d3;
+      let lpState = 0;
+
+      for (let i = 0; i < length; i++) {
+        seed = (seed * 1664525 + 1013904223) >>> 0;
+        const white = (seed / 0xffffffff) * 2 - 1;
+        // 1-pole lowpass damping for natural concrete/industrial corridor warmth
+        lpState = lpState * 0.64 + white * 0.36;
+        const env = Math.pow(1 - i / length, decay);
+        data[i] = lpState * env * 0.48;
+      }
+
+      // Crisp early reflections slightly offset between L/R for stereo width
+      for (let t = 0; t < earlyTapTimes.length; t++) {
+        const tapOffset = earlyTapTimes[t] + (ch === 1 ? 0.0025 : 0);
+        const idx = Math.floor(tapOffset * ctx.sampleRate);
+        if (idx >= 0 && idx < length) {
+          const sign = t % 2 === 0 ? 1 : -1;
+          data[idx] += sign * (0.42 / (t + 1));
+        }
+      }
+    }
+    return buffer;
+  }
+
+  private sendToReverb(source: AudioNode, amount: number): void {
+    if (!this.ctx || !this.reverbSend || amount <= 0.001) return;
+    try {
+      const tap = this.ctx.createGain();
+      tap.gain.value = Math.max(0, Math.min(1, amount));
+      source.connect(tap);
+      tap.connect(this.reverbSend);
+    } catch {
+      // Ignore if context/nodes are mocked partially
+    }
+  }
+
+  public setReverbMix(mix: number): void {
+    this.reverbMix = Math.max(0, Math.min(1, mix));
+    if (this.ctx && this.reverbWet) {
+      this.reverbWet.gain.setTargetAtTime(this.reverbMix, this.ctx.currentTime, 0.02);
+    }
   }
 
   private buildNoiseBuffer(ctx: AudioContext, durationSec: number): AudioBuffer {
@@ -113,7 +239,7 @@ export class SynthAudio {
     if (!ctx || !this.masterGain || !this.noiseBuffer) return;
     if (ctx.state === 'suspended') return;
 
-    this.triggerWeaponShotGraph(ctx, weaponId, this.masterGain, 1.0, 5200);
+    this.triggerWeaponShotGraph(ctx, weaponId, this.masterGain, 1.0, 5200, 0.75);
   }
 
   public playRemoteShot(
@@ -129,12 +255,15 @@ export class SynthAudio {
     const spatial = this.createSpatialChain(ctx, listenerPos, listenerYaw, sourcePos, 95, 5.5);
     if (!spatial) return;
 
+    // Distant shots carry proportionally more room tail
+    const reverbScale = 0.65 + (1 - spatial.attenuation) * 0.55;
     this.triggerWeaponShotGraph(
       ctx,
       weaponId,
       spatial.outputNode,
       spatial.attenuation * 0.88,
-      spatial.lowpassHz
+      spatial.lowpassHz,
+      reverbScale
     );
   }
 
@@ -143,7 +272,8 @@ export class SynthAudio {
     weaponId: WeaponId,
     destination: AudioNode,
     gainScale: number,
-    maxCutoffHz: number
+    maxCutoffHz: number,
+    reverbScale = 0.75
   ): void {
     if (!this.noiseBuffer) return;
     const now = ctx.currentTime;
@@ -159,10 +289,16 @@ export class SynthAudio {
     let punchGain = 0.44;
     let crackHz = 960;
     let crackWave: OscillatorType = 'sawtooth';
+    let subGain = 0.34;
+    let boltDelay = 0.016;
+    let boltFreqStart = 1680;
+    let boltFreqEnd = 880;
+    let boltGain = 0.14;
+    let reverbWeight = 0.36;
 
     switch (weaponId) {
       case 'funke':
-        // Light crisp sidearm snap
+        // Light crisp sidearm snap + quick slide click
         bodyStartHz = 255;
         bodyEndHz = 78;
         bodyDuration = 0.075;
@@ -173,9 +309,15 @@ export class SynthAudio {
         punchGain = 0.29;
         crackHz = 1420;
         crackWave = 'triangle';
+        subGain = 0.18;
+        boltDelay = 0.014;
+        boltFreqStart = 1950;
+        boltFreqEnd = 1120;
+        boltGain = 0.12;
+        reverbWeight = 0.24;
         break;
       case 'bolzer':
-        // Heavy revolver/hand-cannon punch
+        // Heavy revolver/hand-cannon punch + metallic cylinder ring
         bodyStartHz = 142;
         bodyEndHz = 34;
         bodyDuration = 0.21;
@@ -186,9 +328,15 @@ export class SynthAudio {
         punchGain = 0.56;
         crackHz = 760;
         crackWave = 'sawtooth';
+        subGain = 0.48;
+        boltDelay = 0.012;
+        boltFreqStart = 1420;
+        boltFreqEnd = 640;
+        boltGain = 0.18;
+        reverbWeight = 0.48;
         break;
       case 'hornisse':
-        // Rapid high-RPM SMG buzz-pop
+        // Rapid high-RPM SMG buzz-pop + tight bolt chatter
         bodyStartHz = 225;
         bodyEndHz = 66;
         bodyDuration = 0.064;
@@ -199,9 +347,15 @@ export class SynthAudio {
         punchGain = 0.25;
         crackHz = 1220;
         crackWave = 'square';
+        subGain = 0.2;
+        boltDelay = 0.01;
+        boltFreqStart = 2200;
+        boltFreqEnd = 1350;
+        boltGain = 0.11;
+        reverbWeight = 0.22;
         break;
       case 'brecher':
-        // Wide cavernous 8-pellet shotgun boom
+        // Wide cavernous 8-pellet shotgun boom + heavy receiver clunk
         bodyStartHz = 108;
         bodyEndHz = 26;
         bodyDuration = 0.28;
@@ -212,9 +366,15 @@ export class SynthAudio {
         punchGain = 0.62;
         crackHz = 560;
         crackWave = 'sawtooth';
+        subGain = 0.58;
+        boltDelay = 0.026;
+        boltFreqStart = 980;
+        boltFreqEnd = 420;
+        boltGain = 0.2;
+        reverbWeight = 0.58;
         break;
       case 'falke':
-        // Thunderous high-caliber precision crack + long tail
+        // Thunderous high-caliber precision crack + long tail + bolt ring
         bodyStartHz = 132;
         bodyEndHz = 24;
         bodyDuration = 0.38;
@@ -225,10 +385,16 @@ export class SynthAudio {
         punchGain = 0.7;
         crackHz = 1680;
         crackWave = 'sawtooth';
+        subGain = 0.64;
+        boltDelay = 0.018;
+        boltFreqStart = 2480;
+        boltFreqEnd = 920;
+        boltGain = 0.22;
+        reverbWeight = 0.72;
         break;
       case 'lanze':
       default:
-        // Balanced crisp assault rifle bark
+        // Balanced crisp assault rifle bark + gas-block/bolt clack
         bodyStartHz = 172;
         bodyEndHz = 45;
         bodyDuration = 0.135;
@@ -239,6 +405,12 @@ export class SynthAudio {
         punchGain = 0.44;
         crackHz = 960;
         crackWave = 'sawtooth';
+        subGain = 0.36;
+        boltDelay = 0.016;
+        boltFreqStart = 1680;
+        boltFreqEnd = 880;
+        boltGain = 0.15;
+        reverbWeight = 0.38;
         break;
     }
 
@@ -299,6 +471,67 @@ export class SynthAudio {
     snapEnv.connect(destination);
     snapOsc.start(now);
     snapOsc.stop(now + 0.04);
+
+    // 4. Punchy sub-bass chest thump
+    const subOsc = ctx.createOscillator();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(92, now);
+    subOsc.frequency.exponentialRampToValueAtTime(34, now + 0.068);
+
+    const subEnv = ctx.createGain();
+    subEnv.gain.setValueAtTime(Math.max(0.001, subGain * gainScale * 0.65), now);
+    subEnv.gain.exponentialRampToValueAtTime(0.001, now + 0.072);
+
+    subOsc.connect(subEnv);
+    subEnv.connect(destination);
+    subOsc.start(now);
+    subOsc.stop(now + 0.08);
+
+    // 5. Distinct mechanical bolt / receiver click nuance
+    const boltT = now + boltDelay;
+    const boltOsc = ctx.createOscillator();
+    boltOsc.type = 'square';
+    boltOsc.frequency.setValueAtTime(Math.min(boltFreqStart, maxCutoffHz), boltT);
+    boltOsc.frequency.exponentialRampToValueAtTime(Math.max(180, Math.min(boltFreqEnd, maxCutoffHz)), boltT + 0.024);
+
+    const boltBp = ctx.createBiquadFilter();
+    boltBp.type = 'bandpass';
+    boltBp.frequency.value = Math.min(1850, maxCutoffHz);
+    boltBp.Q.value = 2.2;
+
+    const boltEnv = ctx.createGain();
+    boltEnv.gain.setValueAtTime(0.001, boltT);
+    boltEnv.gain.linearRampToValueAtTime(Math.max(0.002, boltGain * gainScale), boltT + 0.002);
+    boltEnv.gain.exponentialRampToValueAtTime(0.001, boltT + 0.026);
+
+    boltOsc.connect(boltBp);
+    boltBp.connect(boltEnv);
+    boltEnv.connect(destination);
+    boltOsc.start(boltT);
+    boltOsc.stop(boltT + 0.03);
+
+    // High-caliber sniper secondary bolt-cycle / brass ring
+    if (weaponId === 'falke' && gainScale > 0.25) {
+      const cycleT = now + 0.09;
+      const ringOsc = ctx.createOscillator();
+      ringOsc.type = 'triangle';
+      ringOsc.frequency.setValueAtTime(2150, cycleT);
+      ringOsc.frequency.exponentialRampToValueAtTime(1480, cycleT + 0.04);
+
+      const ringEnv = ctx.createGain();
+      ringEnv.gain.setValueAtTime(0.001, cycleT);
+      ringEnv.gain.linearRampToValueAtTime(0.09 * gainScale, cycleT + 0.003);
+      ringEnv.gain.exponentialRampToValueAtTime(0.001, cycleT + 0.045);
+
+      ringOsc.connect(ringEnv);
+      ringEnv.connect(destination);
+      ringOsc.start(cycleT);
+      ringOsc.stop(cycleT + 0.05);
+    }
+
+    // 6. Spatial / room reverb tail
+    this.sendToReverb(noiseEnv, reverbWeight * reverbScale);
+    this.sendToReverb(snapEnv, reverbWeight * reverbScale * 0.45);
   }
 
   public playMeleeSlash(): void {
@@ -832,6 +1065,7 @@ export class SynthAudio {
     roar.connect(lp);
     lp.connect(rEnv);
     rEnv.connect(this.masterGain);
+    this.sendToReverb(rEnv, 0.75);
     roar.start(now);
     roar.stop(now + 1.15);
   }
@@ -842,22 +1076,27 @@ export class SynthAudio {
     if (ctx.state === 'suspended') return;
 
     const now = ctx.currentTime;
-    this.scheduleMechanicalClick(ctx, now, 680, 1280, 0.045, 0.2);
+    // Crisp tactile latch click
+    this.scheduleMechanicalClick(ctx, now, 720, 1440, 0.036, 0.18);
 
-    const chime = ctx.createOscillator();
-    chime.type = 'sine';
-    chime.frequency.setValueAtTime(1174.66, now + 0.025);
-    chime.frequency.exponentialRampToValueAtTime(1567.98, now + 0.11);
+    // Clean two-tone harmonic confirmation
+    [1046.5, 1567.98].forEach((freq, idx) => {
+      const t = now + 0.02 + idx * 0.035;
+      const osc = ctx.createOscillator();
+      osc.type = idx === 0 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, t);
 
-    const env = ctx.createGain();
-    env.gain.setValueAtTime(0.001, now + 0.025);
-    env.gain.linearRampToValueAtTime(0.22, now + 0.035);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.001, t);
+      env.gain.linearRampToValueAtTime(idx === 0 ? 0.16 : 0.2, t + 0.008);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
 
-    chime.connect(env);
-    env.connect(this.masterGain);
-    chime.start(now + 0.025);
-    chime.stop(now + 0.16);
+      osc.connect(env);
+      if (this.masterGain) env.connect(this.masterGain);
+      this.sendToReverb(env, 0.18);
+      osc.start(t);
+      osc.stop(t + 0.145);
+    });
   }
 
   public playBuyError(): void {
@@ -866,27 +1105,27 @@ export class SynthAudio {
     if (ctx.state === 'suspended') return;
 
     const now = ctx.currentTime;
-    [0, 0.08].forEach((offset) => {
+    [0, 0.075].forEach((offset, idx) => {
       const t = now + offset;
       const osc = ctx.createOscillator();
       osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(195, t);
-      osc.frequency.linearRampToValueAtTime(155, t + 0.06);
+      osc.frequency.setValueAtTime(idx === 0 ? 210 : 175, t);
+      osc.frequency.linearRampToValueAtTime(idx === 0 ? 165 : 132, t + 0.055);
 
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 650;
+      lp.frequency.value = 620;
 
       const env = ctx.createGain();
       env.gain.setValueAtTime(0.001, t);
-      env.gain.linearRampToValueAtTime(0.22, t + 0.008);
-      env.gain.exponentialRampToValueAtTime(0.001, t + 0.065);
+      env.gain.linearRampToValueAtTime(0.2, t + 0.006);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
 
       osc.connect(lp);
       lp.connect(env);
       if (this.masterGain) env.connect(this.masterGain);
       osc.start(t);
-      osc.stop(t + 0.07);
+      osc.stop(t + 0.068);
     });
   }
 
@@ -1141,19 +1380,95 @@ export class SynthAudio {
 
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    const baseFreq = active ? 1040 : 680;
+    osc.type = 'triangle';
+    const baseFreq = active ? 1080 : 660;
     osc.frequency.setValueAtTime(baseFreq, now);
-    osc.frequency.exponentialRampToValueAtTime(active ? 1380 : 520, now + 0.055);
+    osc.frequency.exponentialRampToValueAtTime(active ? 1460 : 490, now + 0.048);
 
     const env = ctx.createGain();
-    env.gain.setValueAtTime(0.22, now);
-    env.gain.exponentialRampToValueAtTime(0.001, now + 0.065);
+    env.gain.setValueAtTime(0.001, now);
+    env.gain.linearRampToValueAtTime(0.19, now + 0.004);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.058);
 
     osc.connect(env);
     env.connect(this.masterGain);
 
     osc.start(now);
-    osc.stop(now + 0.075);
+    osc.stop(now + 0.068);
+  }
+
+  public playUiHover(): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    if (ctx.state === 'suspended') return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1640, now);
+    osc.frequency.exponentialRampToValueAtTime(2120, now + 0.016);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.001, now);
+    env.gain.linearRampToValueAtTime(0.065, now + 0.002);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+    osc.connect(env);
+    env.connect(this.masterGain);
+    osc.start(now);
+    osc.stop(now + 0.025);
+  }
+
+  public playBuyMenuOpen(open = true): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    if (ctx.state === 'suspended') return;
+
+    const now = ctx.currentTime;
+    this.scheduleMechanicalClick(ctx, now, open ? 520 : 880, open ? 960 : 420, 0.032, 0.12);
+
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(open ? 620 : 940, now + 0.01);
+    osc.frequency.exponentialRampToValueAtTime(open ? 980 : 540, now + 0.08);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.001, now + 0.01);
+    env.gain.linearRampToValueAtTime(0.11, now + 0.02);
+    env.gain.exponentialRampToValueAtTime(0.001, now + 0.095);
+
+    osc.connect(env);
+    env.connect(this.masterGain);
+    this.sendToReverb(env, 0.14);
+    osc.start(now + 0.01);
+    osc.stop(now + 0.105);
+  }
+
+  public playPingSound(type: 'danger' | 'alert' | 'assist' | 'defend' | 'ping' = 'ping'): void {
+    const ctx = this.ensureContext();
+    if (!ctx || !this.masterGain) return;
+    if (ctx.state === 'suspended') return;
+
+    const now = ctx.currentTime;
+    const isDanger = type === 'danger' || type === 'alert';
+    const freqs = isDanger ? [1320, 990] : type === 'defend' ? [880, 1174.66] : [1174.66, 1567.98];
+
+    freqs.forEach((freq, idx) => {
+      const t = now + idx * 0.055;
+      const osc = ctx.createOscillator();
+      osc.type = isDanger ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0.001, t);
+      env.gain.linearRampToValueAtTime(0.17, t + 0.006);
+      env.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+
+      osc.connect(env);
+      if (this.masterGain) env.connect(this.masterGain);
+      this.sendToReverb(env, 0.25);
+      osc.start(t);
+      osc.stop(t + 0.155);
+    });
   }
 }
