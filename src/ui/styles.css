@@ -282,10 +282,10 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 11px;
-  background: rgba(24, 212, 201, 0.1);
-  border: 1px solid rgba(24, 212, 201, 0.36);
-  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  padding: 6px 12px;
+  background: var(--bg-panel-elevated);
+  border: none;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 0.7rem;
   font-weight: 800;
@@ -303,37 +303,45 @@ body {
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.07em;
-  padding: 5px 10px;
-  border: 1px solid var(--border-muted);
-  background: rgba(15, 23, 33, 0.9);
+  padding: 6px 11px;
+  border: none;
+  border-radius: 6px;
+  background: var(--bg-panel);
   color: var(--text-secondary);
 }
 
 .lobby-auth-badge[data-state='online'] {
-  border-color: rgba(56, 226, 157, 0.5);
+  background: #132c24;
   color: var(--accent-emerald);
 }
 
 .lobby-auth-badge[data-state='offline'] {
-  border-color: rgba(255, 196, 77, 0.45);
+  background: #2b2416;
   color: var(--accent-gold);
 }
 
 .client-gear-btn {
-  width: 36px;
   height: 36px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(19, 30, 42, 0.92);
-  border: 1px solid var(--border-muted);
-  color: var(--text-secondary);
+  gap: 7px;
+  background: var(--bg-panel-elevated);
+  border: none;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 
 .client-gear-btn:hover {
-  border-color: var(--accent-cyan);
-  color: var(--text-primary);
+  background: var(--accent-cyan);
+  color: #071018;
 }
 
 .client-gear-btn:focus-visible {

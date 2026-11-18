@@ -290,10 +290,11 @@ export class LobbyScreen {
               aria-label="Einstellungen öffnen"
               title="Einstellungen &amp; Steuerung"
             >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="2"/>
                 <path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.9 1.9M16.8 16.8l1.9 1.9M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
               </svg>
+              <span>EINSTELLUNGEN</span>
             </button>
           </div>
         </header>
