@@ -473,6 +473,14 @@ export class TouchControls {
     };
     this.lookZoneEl.addEventListener('pointerup', releaseLook);
     this.lookZoneEl.addEventListener('pointercancel', releaseLook);
+    this.lookZoneEl.addEventListener('lostpointercapture', releaseLook);
+
+    const releaseJoystick = (): void => {
+      this.joystickPointerId = null;
+      this.joystickBaseEl.classList.remove('is-active');
+      this.joystickKnobEl.style.transform = 'translate3d(0, 0, 0)';
+      this.input.setTouchMove(0, 0);
+    };
 
     // Individual Control Events (both Gameplay & Layout Editor Drag)
     for (const desc of CONTROL_DESCRIPTORS) {
@@ -501,7 +509,7 @@ export class TouchControls {
 
         // Gameplay mode
         if (desc.kind === 'joystick') {
-          if (this.joystickPointerId !== null) return;
+          if (this.joystickPointerId === e.pointerId) return;
           this.joystickPointerId = e.pointerId;
           this.joystickBaseEl.classList.add('is-active');
           try {
@@ -566,10 +574,7 @@ export class TouchControls {
         }
 
         if (desc.kind === 'joystick' && e.pointerId === this.joystickPointerId) {
-          this.joystickPointerId = null;
-          this.joystickBaseEl.classList.remove('is-active');
-          this.joystickKnobEl.style.transform = 'translate3d(0, 0, 0)';
-          this.input.setTouchMove(0, 0);
+          releaseJoystick();
           return;
         }
 
@@ -585,7 +590,42 @@ export class TouchControls {
 
       el.addEventListener('pointerup', releaseCtrl);
       el.addEventListener('pointercancel', releaseCtrl);
+      el.addEventListener('lostpointercapture', releaseCtrl);
     }
+
+    // Global safety net so pointers never stay stuck if capture is lost or released outside
+    const handleGlobalPointerEnd = (e: PointerEvent): void => {
+      if (this.editorOpen) {
+        if (e.pointerId === this.dragPointerId) {
+          this.dragPointerId = null;
+          this.dragControlId = null;
+        }
+        return;
+      }
+      if (e.pointerId === this.lookPointerId) {
+        this.lookPointerId = null;
+      }
+      if (e.pointerId === this.joystickPointerId) {
+        releaseJoystick();
+      }
+      const activeDesc = this.activeButtonPointers.get(e.pointerId);
+      if (activeDesc) {
+        this.activeButtonPointers.delete(e.pointerId);
+        this.controlEls.get(activeDesc.id)?.classList.remove('is-active');
+        if (activeDesc.kind === 'hold' && activeDesc.holdAction) {
+          this.input.setTouchAction(activeDesc.holdAction, false);
+        }
+      }
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerEnd);
+    window.addEventListener('pointercancel', handleGlobalPointerEnd);
+    window.addEventListener('blur', () => this.clearActiveGameplayPointers());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.clearActiveGameplayPointers();
+      }
+    });
 
     // Editor Toolbar Sliders & Buttons
     this.scaleSliderEl.addEventListener('input', () => {

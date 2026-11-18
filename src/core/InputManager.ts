@@ -318,7 +318,7 @@ export class InputManager {
     const jump = this.heldKeys.has(kb.jump) || this.touchJumpHeld || this.jumpLatched;
     const fire = this.mouseLeftHeld || this.touchFireHeld || this.fireLatched;
     const reload = this.heldKeys.has(kb.reload) || this.touchReloadHeld || this.reloadLatched;
-    const ads = this.mouseRightHeld || this.touchAdsHeld;
+    const ads = this.mouseRightHeld || this.touchAdsHeld || this.touchFireHeld;
     const holdKern = this.heldKeys.has(kb.kernInteract) || this.touchKernHeld;
     const equipSlot = this.equipSlotLatched;
 
