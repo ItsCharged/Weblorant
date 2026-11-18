@@ -213,6 +213,7 @@ export class HudOverlay {
   private gameplayActive = false;
   private openedFromLobby = false;
   private isOnlineMatchMode = false;
+  private touchControlsActive = false;
 
   // Top micro-telemetry & badges
   private readonly microTelemetryEl: HTMLElement;
@@ -763,10 +764,13 @@ export class HudOverlay {
             </div>
 
             <div class="mobile-settings-panel">
-              <h2 class="dialog-section-label">Mobile Touch-Steuerung</h2>
+              <div class="mobile-settings-head">
+                <h2 class="dialog-section-label">Mobile Touch-Steuerung</h2>
+                <span class="mobile-status-badge" id="mobile-status-badge">AUTO</span>
+              </div>
               <div class="mobile-mode-selector" id="mobile-mode-selector" role="radiogroup" aria-label="Mobile Touch-Steuerung">
                 <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="auto">Auto</button>
-                <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="on">Immer Ein</button>
+                <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="on">Ein</button>
                 <button type="button" class="mobile-mode-btn" role="radio" data-mobile-mode="off">Aus</button>
               </div>
               <button type="button" id="btn-open-mobile-editor" class="mobile-editor-open-btn">
@@ -1233,6 +1237,14 @@ export class HudOverlay {
       this.closeMenu();
       this.callbacks.onOpenMobileLayoutEditor?.();
     });
+  }
+
+  public setTouchControlsActive(active: boolean): void {
+    this.touchControlsActive = active;
+    this.leftHintsColEl.hidden = active;
+    if (active) {
+      this.unlockedPromptEl.hidden = true;
+    }
   }
 
   private setupNetSimToolbar(): void {
@@ -2208,7 +2220,7 @@ export class HudOverlay {
       this.respawnBannerEl.hidden = true;
     }
 
-    this.unlockedPromptEl.hidden = state.pointerLocked || this.dialog.open;
+    this.unlockedPromptEl.hidden = state.pointerLocked || this.dialog.open || this.touchControlsActive;
 
     // Range challenge pill
     if (state.mapId === 'uebungsanlage' && state.challengeActive) {

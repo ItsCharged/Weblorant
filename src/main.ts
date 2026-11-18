@@ -7,6 +7,7 @@ import {
   loadMobileControlsMode,
   loadSavedKeybinds,
   saveKeybinds,
+  saveMobileControlsMode,
   SIM_TICK_RATE,
   START_CREDITS,
 } from './core/Config';
@@ -67,6 +68,7 @@ import {
   type OnlineHudContext,
 } from './ui/HudOverlay';
 import { LobbyScreen } from './ui/LobbyScreen';
+import { LoadingScreen } from './ui/LoadingScreen';
 import { MatchEndOverlay } from './ui/MatchEndOverlay';
 import { Minimap, type MinimapMarker } from './ui/Minimap';
 import {
@@ -191,6 +193,9 @@ function formatWinReasonHeadline(winnerTeam: TeamId, winReason?: RoundWinReason)
 }
 
 async function bootstrap(): Promise<void> {
+  const loadingScreen = new LoadingScreen();
+  loadingScreen.setProgress(18, 'ENGINE & PHYSIK WERDEN GELADEN...');
+
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement | null;
   const uiRoot = document.getElementById('ui-root') as HTMLElement | null;
   if (!canvas || !uiRoot) {
@@ -237,6 +242,7 @@ async function bootstrap(): Promise<void> {
     Renderer.create(canvas),
     LocalSession.create(initialMap),
   ]);
+  loadingScreen.setProgress(62, 'ARENA WIRD AUFGEBAUT...');
 
   // 2. Audio & Scene Subsystems
   const audio = new SynthAudio(settings.volume);
@@ -247,6 +253,7 @@ async function bootstrap(): Promise<void> {
   renderer.setQuality(settings.graphics);
   mapBuilder.setQuality(settings.graphics);
   mapBuilder.buildMap(initialMap);
+  loadingScreen.setProgress(82, 'OBERFLÄCHE WIRD INITIALISIERT...');
 
   const kernAndBarrierRenderer = new KernAndBarrierRenderer(renderer.scene);
   kernAndBarrierRenderer.buildBarriers(initialMap);
@@ -503,6 +510,7 @@ async function bootstrap(): Promise<void> {
   canvas.addEventListener('click', () => {
     if (
       screenMode === 'in_game' &&
+      !touchControls.isTouchControlsEnabled() &&
       !input.isPointerLocked() &&
       !buyMenu.isOpen() &&
       !matchEndOverlay.isOpen()
@@ -950,6 +958,7 @@ async function bootstrap(): Promise<void> {
     },
     onSettingsChange: (nextSettings: GameSettings) => {
       const graphicsChanged = nextSettings.graphics !== settings.graphics;
+      const mobileChanged = nextSettings.mobileControls !== settings.mobileControls;
       settings = nextSettings;
       if (graphicsChanged) {
         renderer.setQuality(settings.graphics);
@@ -959,6 +968,11 @@ async function bootstrap(): Promise<void> {
         } catch {
           // Auswahl gilt dann nur für diese Sitzung
         }
+      }
+      if (mobileChanged) {
+        saveMobileControlsMode(settings.mobileControls);
+        touchControls.setMode(settings.mobileControls);
+        hud.setTouchControlsActive(touchControls.isTouchControlsEnabled());
       }
       input.setSensitivity(settings.sensitivity);
       input.setKeybinds(settings.keybinds);
@@ -976,8 +990,14 @@ async function bootstrap(): Promise<void> {
       applyNetSimConfig(netSimCfg);
       audio.playUiBeep(true);
     },
+    onOpenMobileLayoutEditor: () => {
+      audio.resume();
+      audio.playUiBeep(true);
+      touchControls.openLayoutEditor();
+    },
   });
   hud.highlightMap(initialMap.id);
+  hud.setTouchControlsActive(touchControls.isTouchControlsEnabled());
 
   // 8. Full-Screen SHARDLINE Main Menu & Multiplayer Lobby Screen
   const initialSavedName = loadSavedPlayerName(null);
@@ -2249,6 +2269,7 @@ async function bootstrap(): Promise<void> {
     },
   };
 
+  loadingScreen.hide();
   loop.start();
 }
 

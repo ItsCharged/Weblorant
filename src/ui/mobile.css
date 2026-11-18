@@ -307,7 +307,40 @@
 .mobile-settings-panel {
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid rgba(37, 50, 70, 0.8);
+  border-top: 1px solid #222d40;
+}
+
+.mobile-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mobile-settings-head .dialog-section-label {
+  margin: 0;
+}
+
+.mobile-status-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: #1c263a;
+  color: #a9b7cc;
+}
+
+.mobile-status-badge[data-mode='on'] {
+  background: #16c784;
+  color: #071018;
+}
+
+.mobile-status-badge[data-mode='off'] {
+  background: #ff4655;
+  color: #ffffff;
 }
 
 .mobile-mode-selector {
@@ -318,40 +351,44 @@
 }
 
 .mobile-mode-btn {
-  padding: 7px 6px;
+  padding: 8px 6px;
   border-radius: 6px;
-  border: 1px solid var(--border-muted, #253246);
-  background: var(--bg-panel, #0e1420);
-  color: var(--text-secondary, #dbe4f0);
+  border: none;
+  background: #1c263a;
+  color: #a9b7cc;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: border-color 0.14s ease, background 0.14s ease, color 0.14s ease;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.mobile-mode-btn:hover {
+  background: #26344f;
+  color: #ffffff;
 }
 
 .mobile-mode-btn.is-active {
-  border-color: var(--accent-cyan, #00e5ff);
-  background: rgba(0, 229, 255, 0.16);
-  color: #ffffff;
+  background: #00c8e0;
+  color: #071018;
 }
 
 .mobile-editor-open-btn {
   width: 100%;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(0, 229, 255, 0.55);
-  background: rgba(0, 229, 255, 0.1);
-  color: #00e5ff;
+  border: none;
+  background: #1c263a;
+  color: #f4f7fb;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
+  transition: background 0.14s ease;
 }
 
 .mobile-editor-open-btn:hover {
-  background: rgba(0, 229, 255, 0.2);
-  color: #ffffff;
+  background: #26344f;
 }
