@@ -1073,14 +1073,19 @@ async function bootstrap(): Promise<void> {
       lobbyScreen.hide();
       switchOfflineMap(mapId);
       hud.setGameplayActive(true, false);
-      input.requestLock();
+      const touchActive = touchControls.isTouchControlsEnabled();
+      hud.setTouchControlsActive(touchActive);
+      touchControls.setGameplayState(true, false);
+      if (!touchActive) {
+        input.requestLock();
+      }
 
       // If pointer lock was declined by automated/headless environment, open pause dialog cleanly
       window.setTimeout(() => {
         if (
           screenMode === 'in_game' &&
           !input.isPointerLocked() &&
-          !input.isTouchMode() &&
+          !touchControls.isTouchControlsEnabled() &&
           !buyMenu.isOpen()
         ) {
           hud.openMenu();

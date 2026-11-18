@@ -406,7 +406,8 @@ export function isTouchDevice(): boolean {
     typeof navigator !== 'undefined' && (navigator.maxTouchPoints ?? 0) > 0;
   const hasCoarsePointer =
     typeof window.matchMedia === 'function' &&
-    window.matchMedia('(pointer: coarse)').matches;
+    (window.matchMedia('(pointer: coarse)').matches ||
+      window.matchMedia('(any-pointer: coarse)').matches);
   return hasTouchStart || hasMaxTouchPoints || hasCoarsePointer;
 }
 

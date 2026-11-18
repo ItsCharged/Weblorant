@@ -353,9 +353,11 @@ export class TouchControls {
   }
 
   private updateVisibility(): void {
+    const enabled = this.isTouchControlsEnabled();
+    this.input.setTouchMode(enabled);
     const shouldShow =
       this.editorOpen ||
-      (this.gameplayActive && !this.overlayBlocking && this.isTouchControlsEnabled());
+      (this.gameplayActive && !this.overlayBlocking && enabled);
 
     this.root.hidden = !shouldShow;
     if (!shouldShow && !this.editorOpen) {
