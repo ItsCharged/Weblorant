@@ -181,6 +181,10 @@ export class TouchControls {
   private lastLookX = 0;
   private lastLookY = 0;
 
+  private fireLookPointerId: number | null = null;
+  private lastFireLookX = 0;
+  private lastFireLookY = 0;
+
   private joystickPointerId: number | null = null;
   private readonly activeButtonPointers = new Map<number, ControlDescriptor>();
 
@@ -398,6 +402,7 @@ export class TouchControls {
 
   private clearActiveGameplayPointers(): void {
     this.lookPointerId = null;
+    this.fireLookPointerId = null;
     this.joystickPointerId = null;
     this.joystickBaseEl.classList.remove('is-active');
     this.joystickKnobEl.style.transform = 'translate3d(0, 0, 0)';
@@ -531,6 +536,11 @@ export class TouchControls {
 
         if (desc.kind === 'hold' && desc.holdAction) {
           this.input.setTouchAction(desc.holdAction, true);
+          if (desc.id === 'fire') {
+            this.fireLookPointerId = e.pointerId;
+            this.lastFireLookX = e.clientX;
+            this.lastFireLookY = e.clientY;
+          }
         } else if (desc.kind === 'tap') {
           if (desc.id === 'pause') {
             this.callbacks.onPauseMenu();
@@ -561,6 +571,16 @@ export class TouchControls {
         if (desc.kind === 'joystick' && e.pointerId === this.joystickPointerId) {
           e.preventDefault();
           this.updateJoystickFromPointer(e.clientX, e.clientY);
+          return;
+        }
+
+        if (desc.id === 'fire' && e.pointerId === this.fireLookPointerId) {
+          e.preventDefault();
+          const dx = e.clientX - this.lastFireLookX;
+          const dy = e.clientY - this.lastFireLookY;
+          this.lastFireLookX = e.clientX;
+          this.lastFireLookY = e.clientY;
+          this.input.addTouchLookDelta(dx, dy);
         }
       });
 
@@ -576,6 +596,10 @@ export class TouchControls {
         if (desc.kind === 'joystick' && e.pointerId === this.joystickPointerId) {
           releaseJoystick();
           return;
+        }
+
+        if (desc.id === 'fire' && e.pointerId === this.fireLookPointerId) {
+          this.fireLookPointerId = null;
         }
 
         const activeDesc = this.activeButtonPointers.get(e.pointerId);
@@ -604,6 +628,9 @@ export class TouchControls {
       }
       if (e.pointerId === this.lookPointerId) {
         this.lookPointerId = null;
+      }
+      if (e.pointerId === this.fireLookPointerId) {
+        this.fireLookPointerId = null;
       }
       if (e.pointerId === this.joystickPointerId) {
         releaseJoystick();
